@@ -1,0 +1,38 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/fruggeri/Desktop/PdS/Esercizi/os_api/lab2/Base.h
+string
+-
+
+/home/fruggeri/Desktop/PdS/Esercizi/os_api/lab2/Directory.h
+Base.h
+/home/fruggeri/Desktop/PdS/Esercizi/os_api/lab2/Base.h
+File.h
+/home/fruggeri/Desktop/PdS/Esercizi/os_api/lab2/File.h
+string
+-
+memory
+-
+unordered_map
+-
+
+/home/fruggeri/Desktop/PdS/Esercizi/os_api/lab2/File.h
+Base.h
+/home/fruggeri/Desktop/PdS/Esercizi/os_api/lab2/Base.h
+memory
+-
+
+/home/fruggeri/Desktop/PdS/Esercizi/os_api/lab2/main.cpp
+iostream
+-
+Directory.h
+/home/fruggeri/Desktop/PdS/Esercizi/os_api/lab2/Directory.h
+filesystem
+-
+
