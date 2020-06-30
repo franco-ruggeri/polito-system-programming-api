@@ -123,8 +123,8 @@ void part2_message_storage() {
 
 int main() {
     std::cout << "start - alive messages: " << Message::getCount() << std::endl;
-//    part1_message_management();
-//    std::cout << "part 1 done - alive messages: " << Message::getCount() << std::endl << std::endl;
+    part1_message_management();
+    std::cout << "part 1 done - alive messages: " << Message::getCount() << std::endl << std::endl;
     part2_message_storage();
     std::cout << "part 2 done - alive messages: " << Message::getCount() << std::endl;
     return 0;
