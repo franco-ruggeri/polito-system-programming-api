@@ -1,1 +1,0 @@
-/usr/bin/c++  -g   CMakeFiles/lab1.dir/main.cpp.o CMakeFiles/lab1.dir/Message.cpp.o CMakeFiles/lab1.dir/DurationLogger.cpp.o CMakeFiles/lab1.dir/MessageStore.cpp.o  -o lab1 
