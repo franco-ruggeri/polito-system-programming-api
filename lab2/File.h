@@ -16,8 +16,8 @@ class File: public Base {
 public:
     static std::shared_ptr<File> makeFile(const std::string& name, uintmax_t size);
 
-    virtual int mType() const override;
-    virtual void ls(int indent) const override;
+    int mType() const override;
+    void ls(int indent) const override;
 
     uintmax_t getSize() const;
 };

@@ -24,8 +24,8 @@ public:
     static std::shared_ptr<Directory> makeDirectory(const std::string& name, std::weak_ptr<Directory> parent);
     static std::shared_ptr<Directory> getRoot();
 
-    virtual int mType() const override;
-    virtual void ls(int indent) const override;
+    int mType() const override;
+    void ls(int indent) const override;
 
     std::shared_ptr<Base> get(const std::string& name) const;
     std::shared_ptr<Directory> getDir(const std::string& name) const;
