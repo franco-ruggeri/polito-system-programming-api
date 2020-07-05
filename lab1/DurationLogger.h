@@ -9,7 +9,7 @@
 
 class DurationLogger {
     std::string name;
-    clock_t duration;
+    std::clock_t duration;
 
 public:
     DurationLogger(const std::string& name);
