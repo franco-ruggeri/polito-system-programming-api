@@ -67,14 +67,14 @@ public:
         static_cast<T&>(*this).deserializeBinary(serialized_obj);
     }
 
-    void deserializeBinary(char *serialized_obj) {
+    void deserializeBinary(const char *serialized_obj) {
         static_cast<T&>(*this).deserializeBinary(serialized_obj);
     }
 };
 
-/********************************
- * JSON serialization of arrays *
- ********************************/
+/*********************************
+ * JSON serialization of vectors *
+ *********************************/
 
 template<typename T>
 std::vector<char> serialize_json(const std::vector<T>& objs) {
@@ -110,7 +110,7 @@ std::vector<T> deserialize_json(std::shared_ptr<char[]> serialized_objs) {
  **************************************/
 
 std::vector<char> serialize_binary_size(std::size_t size);
-std::size_t deserialize_binary_size(char *serialized_size);
+std::size_t deserialize_binary_size(const char *serialized_size);
 
 template<typename A>
 std::vector<char> serialize_binary_attribute(const A& a) {
@@ -123,7 +123,7 @@ std::vector<char> serialize_binary_attribute(const A& a) {
 }
 
 template<typename A>
-std::pair<A, std::size_t> deserialize_binary_attribute(char *serialized_a) {
+std::pair<A, std::size_t> deserialize_binary_attribute(const char *serialized_a) {
     A a;
     std::size_t size_a = sizeof(A);                                 // attribute size
     serialized_a += sizeof(size_a);                                 // skip size (assumed same as sizeof(A))
@@ -134,33 +134,48 @@ std::pair<A, std::size_t> deserialize_binary_attribute(char *serialized_a) {
 }
 
 
-/**********************************
- * Binary serialization of arrays *
- **********************************/
+/***********************************
+ * Binary serialization of vectors *
+ ***********************************/
 
 template<typename T>
 std::vector<char> serialize_binary(const std::vector<T>& objs) {
     std::vector<char> serialized_objs;
-    serialized_objs = serialize_binary_size(objs.size());   // number of objects
-    for (const auto& obj : objs) {                          // objects
+    std::size_t total_size = 0;
+
+    // objects
+    for (const auto& obj : objs) {
         std::vector<char> serialized_obj = obj.serializeBinary();
-        std::copy(serialized_obj.begin(), serialized_obj.end(), std::back_inserter(serialized_objs));
+        std::copy(std::move_iterator(serialized_obj.begin()), std::move_iterator(serialized_obj.end()), std::back_inserter(serialized_objs));
+        total_size += serialized_obj.size();
     }
-    return serialized_objs;
+
+    // total size
+    std::vector<char> serialized_size = serialize_binary_size(total_size);
+    std::copy(std::move_iterator(serialized_objs.begin()), std::move_iterator(serialized_objs.end()), std::back_inserter(serialized_size));
+
+    return serialized_size;
 }
 
 template<typename T>
 std::vector<T> deserialize_binary(std::shared_ptr<char[]> serialized_objs) {
     std::vector<T> objs;
     char *ptr = serialized_objs.get();
-    std::size_t n_objs = deserialize_binary_size(ptr);      // number of objects
-    ptr += sizeof(n_objs);
-    for (int i=0; i<n_objs; i++) {                          // objects
+    std::size_t total_size, nused;
+
+    // total size
+    total_size = deserialize_binary_size(ptr);
+    ptr += sizeof(total_size);
+    nused=sizeof(total_size);
+
+    // objects
+    while (nused < total_size) {
         std::size_t size_obj = deserialize_binary_size(ptr);
         T t;
         t.deserializeBinary(ptr);
         objs.push_back(t);
         ptr += sizeof(size_obj) + size_obj;
+        nused += sizeof(size_obj) + size_obj;
     }
     return objs;
 }

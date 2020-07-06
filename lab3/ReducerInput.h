@@ -17,7 +17,6 @@ class ReducerInput: public Serializable<ReducerInput<K,V,A>> {
 public:
     ReducerInput() {}
     ReducerInput(K key, V value, A acc): key(key), value(value), acc(acc) {}
-    ReducerInput(const ReducerInput& other): key(other.key), value(other.value), acc(other.acc) {}
 
     K getKey() const { return key; }
     V getValue() const { return value; }
@@ -39,14 +38,14 @@ public:
 
     std::vector<char> serializeBinary() const {
         std::vector<char> tmp, serialized_obj;
-        std::size_t total_size = 3*sizeof(std::size_t) + key.size() + sizeof(value);
+        std::size_t total_size = 3*sizeof(std::size_t) + key.size() + sizeof(value) + sizeof(acc);
         serialized_obj = serialize_binary_size(total_size);     // total size
         tmp = serialize_binary_attribute(key);                  // key
-        std::copy(tmp.begin(), tmp.end(), std::back_inserter(serialized_obj));
+        std::copy(std::move_iterator(tmp.begin()), std::move_iterator(tmp.end()), std::back_inserter(serialized_obj));
         tmp = serialize_binary_attribute(value);                // value
-        std::copy(tmp.begin(), tmp.end(), std::back_inserter(serialized_obj));
+        std::copy(std::move_iterator(tmp.begin()), std::move_iterator(tmp.end()), std::back_inserter(serialized_obj));
         tmp = serialize_binary_attribute(acc);                  // acc
-        std::copy(tmp.begin(), tmp.end(), std::back_inserter(serialized_obj));
+        std::copy(std::move_iterator(tmp.begin()), std::move_iterator(tmp.end()), std::back_inserter(serialized_obj));
         return serialized_obj;
     }
 
@@ -54,7 +53,7 @@ public:
         deserializeBinary(serialized_obj.get());
     }
 
-    void deserializeBinary(char *serialized_obj) {
+    void deserializeBinary(const char *serialized_obj) {
         serialized_obj += sizeof(std::size_t);   // skip total size
         std::pair<K,std::size_t> key_res = deserialize_binary_attribute<K>(serialized_obj);
         key = key_res.first;
@@ -65,3 +64,17 @@ public:
         acc = deserialize_binary_attribute<A>(serialized_obj).first;
     }
 };
+
+template<>
+std::vector<char> ReducerInput<std::string,std::string,std::string>::serializeBinary() const {
+    std::vector<char> tmp, serialized_obj;
+    std::size_t total_size = 3*sizeof(std::size_t) + key.size() + value.size() + acc.size();
+    serialized_obj = serialize_binary_size(total_size);     // total size
+    tmp = serialize_binary_attribute(key);                  // key
+    std::copy(std::move_iterator(tmp.begin()), std::move_iterator(tmp.end()), std::back_inserter(serialized_obj));
+    tmp = serialize_binary_attribute(value);                // value
+    std::copy(std::move_iterator(tmp.begin()), std::move_iterator(tmp.end()), std::back_inserter(serialized_obj));
+    tmp = serialize_binary_attribute(acc);                  // acc
+    std::copy(std::move_iterator(tmp.begin()), std::move_iterator(tmp.end()), std::back_inserter(serialized_obj));
+    return serialized_obj;
+}

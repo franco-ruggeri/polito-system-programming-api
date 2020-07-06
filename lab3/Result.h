@@ -45,9 +45,9 @@ public:
         std::size_t total_size = 2*sizeof(std::size_t) + key.size() + sizeof(value);
         serialized_obj = serialize_binary_size(total_size);     // total size
         tmp = serialize_binary_attribute(key);                  // key
-        std::copy(tmp.begin(), tmp.end(), std::back_inserter(serialized_obj));
+        std::copy(std::move_iterator(tmp.begin()), std::move_iterator(tmp.end()), std::back_inserter(serialized_obj));
         tmp = serialize_binary_attribute(value);                // value
-        std::copy(tmp.begin(), tmp.end(), std::back_inserter(serialized_obj));
+        std::copy(std::move_iterator(tmp.begin()), std::move_iterator(tmp.end()), std::back_inserter(serialized_obj));
         return serialized_obj;
     }
 
@@ -55,7 +55,7 @@ public:
         deserializeBinary(serialized_obj.get());
     }
 
-    void deserializeBinary(char *serialized_obj) {
+    void deserializeBinary(const char *serialized_obj) {
         serialized_obj += sizeof(std::size_t);   // skip total size
         std::pair<K,std::size_t> key_res = deserialize_binary_attribute<K>(serialized_obj);
         key = key_res.first;
@@ -64,4 +64,14 @@ public:
     }
 };
 
-
+template<>
+inline std::vector<char> Result<std::string,std::string>::serializeBinary() const {
+    std::vector<char> tmp, serialized_obj;
+    std::size_t total_size = 2*sizeof(std::size_t) + key.size() + value.size();
+    serialized_obj = serialize_binary_size(total_size);     // total size
+    tmp = serialize_binary_attribute(key);                  // key
+    std::copy(std::move_iterator(tmp.begin()), std::move_iterator(tmp.end()), std::back_inserter(serialized_obj));
+    tmp = serialize_binary_attribute(value);                // value
+    std::copy(std::move_iterator(tmp.begin()), std::move_iterator(tmp.end()), std::back_inserter(serialized_obj));
+    return serialized_obj;
+}

@@ -48,7 +48,7 @@ public:
         deserializeBinary(serialized_obj.get());
     }
 
-    void deserializeBinary(char *serialized_obj) {
+    void deserializeBinary(const char *serialized_obj) {
         serialized_obj += sizeof(std::size_t);   // skip total size
         input = deserialize_binary_attribute<std::string>(serialized_obj).first;
     }
