@@ -7,7 +7,7 @@
 #include "Serializable.h"
 #include <vector>
 
-#define INVALID_FD 0
+#define INVALID_FD -1
 
 class Pipe {
     int fd[2];

@@ -122,6 +122,7 @@ std::vector<ResultT> map_reduce_multi_process_multiplexed(std::istream& input, M
     std::queue<ResultT> mapper_results;
     std::vector<ResultT> mapper_new_results;
     ResultT result;
+    K key;
     std::shared_ptr<char[]> read_ptr;
     std::vector<char> write_v;
     std::vector<Pipe> pipes(4);     // 0 -> cm, 1 -> mc, 2 -> cr, 3 -> rc
@@ -147,9 +148,11 @@ std::vector<ResultT> map_reduce_multi_process_multiplexed(std::istream& input, M
                     pipes[1].write(write_v);
                 }
             } catch (PipeException e) {
-                if (e.isEOF())
+                if (e.isEOF()) {
+                    pipes[0].close();
+                    pipes[1].close();
                     std::exit(EXIT_SUCCESS);    // input terminated => all done for the mapper
-                else throw;
+                } else throw;
             }
         }
     } else if (pid < 0) {
@@ -170,14 +173,18 @@ std::vector<ResultT> map_reduce_multi_process_multiplexed(std::istream& input, M
             try {
                 read_ptr = pipes[2].read();
                 result.deserializeBinary(read_ptr);
-                reducer_input = ReducerInputT(result.getKey(), result.getValue(), accs[result.getKey()]);
+                key = result.getKey();
+                reducer_input = ReducerInputT(key, result.getValue(), accs[key]);
                 result = reduce_fun(reducer_input);
+                accs[key] = result.getValue();
                 write_v = result.serializeBinary();
                 pipes[3].write(write_v);
             } catch (PipeException e) {
-                if (e.isEOF())
+                if (e.isEOF()) {
+                    pipes[2].close();
+                    pipes[3].close();
                     std::exit(EXIT_SUCCESS);    // input terminated => all done for the reducer
-                else throw;
+                } else throw;
             }
         }
     } else if (pid < 0) {
@@ -191,9 +198,6 @@ std::vector<ResultT> map_reduce_multi_process_multiplexed(std::istream& input, M
     pipes[1].closeWrite();
     pipes[2].closeRead();
     pipes[3].closeWrite();
-
-    // TODO: buggato, 1 per tutti, non funziona l'accumulator
-    // problema per terminazione, select() e' ok se la pipe dara' broken pipe? prova
 
     while (std::any_of(pipes.begin(), pipes.end(), [](Pipe& p) { return !p.isClose(); })) {
         Pipe::select(pipes);
@@ -358,7 +362,6 @@ int main() {
             <MapperInput, ReducerInput<std::string, int, int>, Result<std::string, int>, std::string, int>
             (input, map_count_by_hour, reduce_count);
     std::cout << "Count by hour:\n" << count_by_hour << std::endl;
-
 
     /****************
      * Count by url *

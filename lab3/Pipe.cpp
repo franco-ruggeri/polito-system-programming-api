@@ -18,7 +18,7 @@ Pipe::~Pipe() {
 void Pipe::write(const std::vector<char>& content) {
     if (::write(fd[1], reinterpret_cast<const char *>(&content[0]), content.size()) <= 0)
         throw PipeException("write() failed");
-    readyWrite = true;
+    readyWrite = false;
 }
 
 void Pipe::read(char *ptr, size_t n) {
