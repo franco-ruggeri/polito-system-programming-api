@@ -1,0 +1,10 @@
+invalid line
+188.27.146.10 - - [01/Jan/2020:00:37:02 +0100] "GET / HTTP/1.1" 200 20744
+120.29.52.229 - - [01/Jan/2020:00:29:55 +0100] "GET / HTTP/1.1" 200 20744
+invalid line
+invalid line
+invalid line
+invalid line
+invalid line
+209.17.96.34 - - [01/Jan/2020:00:19:59 +0100] "GET / HTTP/1.1" 200 20744
+120.29.52.229 - - [01/Jan/2020:00:29:55 +0100] "GET / HTTP/1.1" 200 20744

@@ -68,6 +68,9 @@ void consume(std::regex regex) {
 int main(int argc, char **argv) {
     if (argc < 3) {
         std::cerr << "usage: " << argv[0] << " directory regex" << std::endl;
+        std::cerr << "example of regex for IP address: "
+                  << "((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
+                  << std::endl;
         std::exit(EXIT_FAILURE);
     }
 
