@@ -7,6 +7,7 @@
 #include <queue>
 #include <mutex>
 #include <atomic>
+#include <optional>
 
 template<typename T>
 class Jobs {
@@ -14,11 +15,15 @@ class Jobs {
     std::mutex m_jobs;
     std::condition_variable cv_full;
     std::condition_variable cv_empty;
-    std::atomic<bool> closed;
+    std::atomic<int> active_producers;
     static const long max_size = 1024;
 
+    bool is_closed() {
+        return active_producers.load() == 0;
+    }
+
 public:
-    Jobs(): closed(false) {}
+    Jobs(int n_producers) : active_producers(n_producers) {}
 
     // insert a job in the queue waiting to be processed, or blocks if the queue is full
     void put(T job) {
@@ -29,26 +34,19 @@ public:
     }
 
     // read a job from the queue and remove it, or blocks if the queue is empty
-    T get() {
+    std::optional<T> get() {
         std::unique_lock ul(m_jobs);
-        cv_empty.wait(ul, [&]() { return !jobs.empty(); });
+        cv_empty.wait(ul, [&]() { return !jobs.empty() || is_closed(); });
+        if (jobs.empty()) return std::nullopt;  // no jobs and no producers
         T t = jobs.front();
         jobs.pop();
         cv_full.notify_one();
         return t;
     }
 
-    bool empty() {
-        std::lock_guard lg(m_jobs);
-        return jobs.empty();
-    }
-
-    bool is_closed() {
-        return closed.load();
-    }
-
+    // unregister active producer
     void close() {
-        closed.store(true);     // before notifying!
+        active_producers--;     // before notifying!
         cv_empty.notify_all();
     }
 };
