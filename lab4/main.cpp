@@ -37,7 +37,7 @@ void produce(fs::path path) {
 void consume(std::regex regex) {
     std::sregex_iterator r_end;
 
-    while (!jobs.isClosed() || !jobs.isEmpty()) {
+    while (!jobs.is_closed() || !jobs.empty()) {
         // get job
         FileLine fl = jobs.get();
         std::string filename = fl.getFilename();
