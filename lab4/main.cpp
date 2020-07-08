@@ -2,6 +2,7 @@
 #include <fstream>
 #include <filesystem>
 #include <thread>
+#include <mutex>
 #include <regex>
 #include "Jobs.h"
 #include "FileLine.h"
@@ -13,9 +14,14 @@ namespace fs = std::filesystem;
 
 Jobs<fs::path> file_jobs(1);
 Jobs<FileLine> line_jobs(N_PRODUCERS);
+std::mutex m_output;
+
+void print(std::string msg) {
+    std::lock_guard lg(m_output);
+    std::cout << msg << std::endl;
+}
 
 void produce() {
-    std::cout << "what?"<<std::endl;
     std::regex txt_regex(".+\\.txt");
 
     while (true) {
@@ -36,7 +42,6 @@ void produce() {
         while (std::getline(ifs, line))
             line_jobs.put(FileLine(filename, line, line_number++));
     }
-    line_jobs.close();
 }
 
 void consume(std::regex regex) {
@@ -54,8 +59,8 @@ void consume(std::regex regex) {
         // consume line
         std::sregex_iterator r_begin(line.begin(), line.end(), regex);
         for (std::sregex_iterator it=r_begin; it != r_end; it++) {
-            std::string output("filename: " + filename + " --- line: " + std::to_string(line_number) + " --- match: " + it->str() + "\n");
-            std::cout << output;
+            std::string output("filename: " + filename + " --- line: " + std::to_string(line_number) + " --- match: " + it->str());
+            print(output);
         }
     }
 }
@@ -84,6 +89,7 @@ int main(int argc, char **argv) {
     // wait
     for (auto& p : producers)
         p.join();
+    line_jobs.close();
     for (auto& c : consumers)
         c.join();
 

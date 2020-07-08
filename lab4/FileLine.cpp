@@ -4,8 +4,8 @@
 
 #include "FileLine.h"
 
-FileLine::FileLine(std::string filename, std::string line, unsigned int lineNumber) : filename(filename), line(line),
-                                                                                      lineNumber(lineNumber) {}
+FileLine::FileLine(std::string filename, std::string line, unsigned int lineNumber) :
+                    filename(filename), line(line), lineNumber(lineNumber) {}
 
 std::string FileLine::getFilename() {
     return filename;

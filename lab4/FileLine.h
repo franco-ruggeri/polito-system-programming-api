@@ -12,6 +12,7 @@ class FileLine {
     unsigned int lineNumber;
 
 public:
+    FileLine() {}
     FileLine(std::string filename, std::string line, unsigned int lineNumber);
     std::string getFilename();
     std::string getLine();
