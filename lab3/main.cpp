@@ -148,11 +148,8 @@ std::vector<ResultT> map_reduce_multi_process_multiplexed(std::istream& input, M
                     pipes[1].write(write_v);
                 }
             } catch (PipeException e) {
-                if (e.isEOF()) {
-                    pipes[0].close();
-                    pipes[1].close();
-                    std::exit(EXIT_SUCCESS);    // input terminated => all done for the mapper
-                } else throw;
+                if (e.isEOF()) std::exit(EXIT_SUCCESS);    // input terminated => all done for the mapper
+                else throw;
             }
         }
     } else if (pid < 0) {
@@ -180,11 +177,8 @@ std::vector<ResultT> map_reduce_multi_process_multiplexed(std::istream& input, M
                 write_v = result.serializeBinary();
                 pipes[3].write(write_v);
             } catch (PipeException e) {
-                if (e.isEOF()) {
-                    pipes[2].close();
-                    pipes[3].close();
-                    std::exit(EXIT_SUCCESS);    // input terminated => all done for the reducer
-                } else throw;
+                if (e.isEOF()) std::exit(EXIT_SUCCESS);    // input terminated => all done for the reducer
+                else throw;
             }
         }
     } else if (pid < 0) {
@@ -220,8 +214,7 @@ std::vector<ResultT> map_reduce_multi_process_multiplexed(std::istream& input, M
                 result.deserializeBinary(read_ptr);
                 mapper_results.push(result);
             } catch (PipeException e) {
-                if (e.isEOF())
-                    pipes[1].close();
+                if (e.isEOF()) pipes[1].close();
                 else throw;
             }
         }
@@ -233,7 +226,7 @@ std::vector<ResultT> map_reduce_multi_process_multiplexed(std::istream& input, M
                 mapper_results.pop();
                 write_v = result.serializeBinary();
                 pipes[2].write(write_v);
-            } else if (pipes[0].isClose()) {
+            } else if (pipes[0].isClose() && pipes[1].isClose()) {
                 pipes[2].close();   // all done for reducer
             }
         }
@@ -245,8 +238,7 @@ std::vector<ResultT> map_reduce_multi_process_multiplexed(std::istream& input, M
                 result.deserializeBinary(read_ptr);
                 accs[result.getKey()] = result.getValue();
             } catch (PipeException e) {
-                if (e.isEOF())
-                    pipes[3].close();
+                if (e.isEOF()) pipes[3].close();
                 else throw;
             }
         }
@@ -301,40 +293,40 @@ int main() {
         std::exit(EXIT_FAILURE);
     }
 
-    // compare JSON and binary serialization
-    measure_serialization(input, serialize_json<MapperInput>, deserialize_json<MapperInput>, "JSON serialization");
-    measure_serialization(input, serialize_binary<MapperInput>, deserialize_binary<MapperInput>, "binary serialization");
-    std::cout << "\n";
-
-    DurationLogger dl("main - MapReduce");
-
-    /***************
-     * Count by ip *
-     ***************/
+//    // compare JSON and binary serialization
+//    measure_serialization(input, serialize_json<MapperInput>, deserialize_json<MapperInput>, "JSON serialization");
+//    measure_serialization(input, serialize_binary<MapperInput>, deserialize_binary<MapperInput>, "binary serialization");
+//    std::cout << "\n";
+//
+//    DurationLogger dl("main - MapReduce");
+//
+//    /***************
+//     * Count by ip *
+//     ***************/
     // reduce for counting
     auto reduce_count = [](const auto& input) {
         return Result(input.getKey(), input.getAcc() + input.getValue());
     };
-
-    // prepare file stream
-    input.clear();
-    input.seekg(0);
-
-    // map
-    auto map_count_by_ip = [](const MapperInput& mapper_input) {
-        std::istringstream iss(mapper_input.getInput());
-        std::string ip;
-        if (iss >> ip)
-            return std::vector{Result(ip, 1)};
-        else
-            std::exit(EXIT_FAILURE);
-    };
-
-    // run map-reduce
-    auto count_by_ip = map_reduce_multi_process_multiplexed
-            <MapperInput, ReducerInput<std::string, int, int>, Result<std::string, int>, std::string, int>
-            (input, map_count_by_ip, reduce_count);
-    std::cout << "Count by IP address:\n" << count_by_ip << std::endl;
+//
+//    // prepare file stream
+//    input.clear();
+//    input.seekg(0);
+//
+//    // map
+//    auto map_count_by_ip = [](const MapperInput& mapper_input) {
+//        std::istringstream iss(mapper_input.getInput());
+//        std::string ip;
+//        if (iss >> ip)
+//            return std::vector{Result(ip, 1)};
+//        else
+//            std::exit(EXIT_FAILURE);
+//    };
+//
+//    // run map-reduce
+//    auto count_by_ip = map_reduce_multi_process_multiplexed
+//            <MapperInput, ReducerInput<std::string, int, int>, Result<std::string, int>, std::string, int>
+//            (input, map_count_by_ip, reduce_count);
+//    std::cout << "Count by IP address:\n" << count_by_ip << std::endl;
 
 
     /*****************
