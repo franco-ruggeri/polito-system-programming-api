@@ -111,17 +111,30 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named lab4
+# Target rules for targets named part2
 
 # Build rule for target.
-lab4: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 lab4
-.PHONY : lab4
+part2: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 part2
+.PHONY : part2
 
 # fast build rule for target.
-lab4/fast:
-	$(MAKE) -f CMakeFiles/lab4.dir/build.make CMakeFiles/lab4.dir/build
-.PHONY : lab4/fast
+part2/fast:
+	$(MAKE) -f CMakeFiles/part2.dir/build.make CMakeFiles/part2.dir/build
+.PHONY : part2/fast
+
+#=============================================================================
+# Target rules for targets named part1
+
+# Build rule for target.
+part1: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 part1
+.PHONY : part1
+
+# fast build rule for target.
+part1/fast:
+	$(MAKE) -f CMakeFiles/part1.dir/build.make CMakeFiles/part1.dir/build
+.PHONY : part1/fast
 
 FileLine.o: FileLine.cpp.o
 
@@ -129,7 +142,7 @@ FileLine.o: FileLine.cpp.o
 
 # target to build an object file
 FileLine.cpp.o:
-	$(MAKE) -f CMakeFiles/lab4.dir/build.make CMakeFiles/lab4.dir/FileLine.cpp.o
+	$(MAKE) -f CMakeFiles/part1.dir/build.make CMakeFiles/part1.dir/FileLine.cpp.o
 .PHONY : FileLine.cpp.o
 
 FileLine.i: FileLine.cpp.i
@@ -138,7 +151,7 @@ FileLine.i: FileLine.cpp.i
 
 # target to preprocess a source file
 FileLine.cpp.i:
-	$(MAKE) -f CMakeFiles/lab4.dir/build.make CMakeFiles/lab4.dir/FileLine.cpp.i
+	$(MAKE) -f CMakeFiles/part1.dir/build.make CMakeFiles/part1.dir/FileLine.cpp.i
 .PHONY : FileLine.cpp.i
 
 FileLine.s: FileLine.cpp.s
@@ -147,35 +160,62 @@ FileLine.s: FileLine.cpp.s
 
 # target to generate assembly for a file
 FileLine.cpp.s:
-	$(MAKE) -f CMakeFiles/lab4.dir/build.make CMakeFiles/lab4.dir/FileLine.cpp.s
+	$(MAKE) -f CMakeFiles/part1.dir/build.make CMakeFiles/part1.dir/FileLine.cpp.s
 .PHONY : FileLine.cpp.s
 
-main.o: main.cpp.o
+part1.o: part1.cpp.o
 
-.PHONY : main.o
+.PHONY : part1.o
 
 # target to build an object file
-main.cpp.o:
-	$(MAKE) -f CMakeFiles/lab4.dir/build.make CMakeFiles/lab4.dir/main.cpp.o
-.PHONY : main.cpp.o
+part1.cpp.o:
+	$(MAKE) -f CMakeFiles/part1.dir/build.make CMakeFiles/part1.dir/part1.cpp.o
+.PHONY : part1.cpp.o
 
-main.i: main.cpp.i
+part1.i: part1.cpp.i
 
-.PHONY : main.i
+.PHONY : part1.i
 
 # target to preprocess a source file
-main.cpp.i:
-	$(MAKE) -f CMakeFiles/lab4.dir/build.make CMakeFiles/lab4.dir/main.cpp.i
-.PHONY : main.cpp.i
+part1.cpp.i:
+	$(MAKE) -f CMakeFiles/part1.dir/build.make CMakeFiles/part1.dir/part1.cpp.i
+.PHONY : part1.cpp.i
 
-main.s: main.cpp.s
+part1.s: part1.cpp.s
 
-.PHONY : main.s
+.PHONY : part1.s
 
 # target to generate assembly for a file
-main.cpp.s:
-	$(MAKE) -f CMakeFiles/lab4.dir/build.make CMakeFiles/lab4.dir/main.cpp.s
-.PHONY : main.cpp.s
+part1.cpp.s:
+	$(MAKE) -f CMakeFiles/part1.dir/build.make CMakeFiles/part1.dir/part1.cpp.s
+.PHONY : part1.cpp.s
+
+part2.o: part2.cpp.o
+
+.PHONY : part2.o
+
+# target to build an object file
+part2.cpp.o:
+	$(MAKE) -f CMakeFiles/part2.dir/build.make CMakeFiles/part2.dir/part2.cpp.o
+.PHONY : part2.cpp.o
+
+part2.i: part2.cpp.i
+
+.PHONY : part2.i
+
+# target to preprocess a source file
+part2.cpp.i:
+	$(MAKE) -f CMakeFiles/part2.dir/build.make CMakeFiles/part2.dir/part2.cpp.i
+.PHONY : part2.cpp.i
+
+part2.s: part2.cpp.s
+
+.PHONY : part2.s
+
+# target to generate assembly for a file
+part2.cpp.s:
+	$(MAKE) -f CMakeFiles/part2.dir/build.make CMakeFiles/part2.dir/part2.cpp.s
+.PHONY : part2.cpp.s
 
 # Help Target
 help:
@@ -185,13 +225,17 @@ help:
 	@echo "... depend"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
-	@echo "... lab4"
+	@echo "... part2"
+	@echo "... part1"
 	@echo "... FileLine.o"
 	@echo "... FileLine.i"
 	@echo "... FileLine.s"
-	@echo "... main.o"
-	@echo "... main.i"
-	@echo "... main.s"
+	@echo "... part1.o"
+	@echo "... part1.i"
+	@echo "... part1.s"
+	@echo "... part2.o"
+	@echo "... part2.i"
+	@echo "... part2.s"
 .PHONY : help
 
 

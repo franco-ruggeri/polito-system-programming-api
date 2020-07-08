@@ -6,6 +6,7 @@
 
 #include <queue>
 #include <mutex>
+#include <condition_variable>
 #include <atomic>
 #include <optional>
 #include <stdexcept>
@@ -21,7 +22,7 @@ class Jobs {
     static const unsigned int default_size = 1024;
 
 public:
-    Jobs(int n_producers) : jobs(default_size), closed(false) {}
+    Jobs() : jobs(default_size), closed(false) {}
 
     // insert a job in the queue waiting to be processed, or blocks if the queue is full
     void put(T job) {

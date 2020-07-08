@@ -12,8 +12,8 @@
 
 namespace fs = std::filesystem;
 
-Jobs<fs::path> file_jobs(1);
-Jobs<FileLine> line_jobs(N_PRODUCERS);
+Jobs<fs::path> file_jobs;
+Jobs<FileLine> line_jobs;
 std::mutex m_output;
 
 void print(std::string msg) {
