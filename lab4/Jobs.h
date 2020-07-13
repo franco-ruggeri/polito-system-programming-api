@@ -27,7 +27,7 @@ public:
     void put(T job) {
         std::unique_lock ul(m_jobs);
         if (closed) throw std::logic_error("put() called on closed queue");
-        cv_full.wait(ul, [&]() { return !jobs.full(); });
+        cv_full.wait(ul, [this]() { return !jobs.full(); });
         jobs.put(job);
         cv_empty.notify_one();
     }

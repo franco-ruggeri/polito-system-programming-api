@@ -37,7 +37,7 @@ public:
     void put(T job) {
         std::unique_lock ul(m_jobs);
         if (closed) throw std::logic_error("put() called on closed queue");
-        cv_full.wait(ul, [&]() { return jobs.size() < max_size; });
+        cv_full.wait(ul, [this]() { return jobs.size() < max_size; });
         jobs.push(std::move(job));
         cv_empty.notify_one();
     }
