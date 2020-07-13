@@ -1,3 +1,7 @@
+//
+// Created by fruggeri on 7/13/20.
+//
+
 #include <iostream>
 #include <unordered_map>
 #include <list>
@@ -9,10 +13,7 @@
 #include "Jobs.h"
 #include "User.h"
 
-#define MAX_CLIENTS 16
-#define MAX_MESSAGES 1024
-
-// TODO: buffered read in Socket.cpp
+#define MAX_CLIENTS 32
 
 Jobs<std::shared_ptr<Socket>> users_login;
 Jobs<std::shared_ptr<User>> users_receive;
@@ -26,26 +27,56 @@ void print(std::string msg) {
 }
 
 std::optional<std::shared_ptr<User>> login(std::shared_ptr<Socket> socket) {
+    // receive nickname
     std::optional<std::string> nickname = socket->receive_line(protocol::max_idle_time);
     if (!nickname) return std::nullopt;     // connection closed by client or timeout
 
     // check nickname
     std::unique_lock ul_users(m_users);
     if (users.contains(*nickname) || nickname->find(' ') != std::string::npos) {
-        socket->send_line(protocol::invalid_nickname);
+        socket->send_line("error: invalid nickname (already used or with spaces)");
         return std::nullopt;
     }
 
     // create and add user
     std::shared_ptr<User> user = std::make_shared<User>(socket, *nickname);
     users[*nickname] = user;
+
+    // send online users and login message
+    std::string message = "[info] " + *nickname + " is now online";
+    std::ostringstream oss;
+    oss << "[info] " << (users.size() == 1 ? "nobody online" : "online users:");
+    for (const auto& u : users) {
+        if (u.second != user) {
+            u.second->send_message(message);
+            oss << " " << u.first;
+        }
+    }
+    ul_users.unlock();
+    socket->send_line(oss.str());
+
+    // send last messages
+    std::unique_lock ul_messages(m_messages);
+    for (const auto& m : messages)
+        socket->send_line(m);
+    ul_messages.unlock();
+    socket->send_line("");  // empty line => end of last messages
+
     return user;
+}
+
+void logout(std::shared_ptr<User> user) {
+    user->logout();
+    std::lock_guard lg(m_users);
+    std::string nickname = user->get_nickname();
+    users.erase(nickname);
+    for (const auto& u : users)
+        u.second->send_message("[info] " + nickname + " logged out");
 }
 
 // service: send messages to other users (+ login and logout)
 void send_messages() {
     print("New sender - Hello world!");
-    static const std::regex pm_regex("^/private .+ .+$");
 
     while (true) {
         // login
@@ -55,36 +86,22 @@ void send_messages() {
         std::shared_ptr<User> user = *opt_u;
         std::string nickname = user->get_nickname();
 
-        // send online users
-        std::unique_lock ul_users(m_users);
-        std::ostringstream oss;
-        oss << "online users:";
-        for (const auto& u : users)
-            oss << " " << u.first;
-        ul_users.unlock();          // before sending, so other threads do not wait uselessly
-        socket->send_line(oss.str());
-
-        // send last messages
-        std::unique_lock ul_messages(m_messages);
-        for (const auto& m : messages)
-            socket->send_line(m);
-        ul_messages.unlock();
-
         // launch receive service
         users_receive.put(user);
 
         while (true) {
             // receive command from user
             std::optional<std::string> command = socket->receive_line(protocol::max_idle_time);
-            if (!command) break;    // connection closed by client or timeout
 
-            // correct termination => gracefully terminate
-            if (*command == protocol::termination)
-                break;
+            // connection closed by client or timeout or correct termination => close socket => serve to next user
+            if (!command || std::regex_match(*command, protocol::termination)) break;
+
+            // empty command => skip
+            if (command->empty()) continue;
 
             // send message to other user(s) (produce)
             std::unique_lock ul_users(m_users);
-            if (std::regex_match(*command, pm_regex)) {     // private (to one user)
+            if (std::regex_match(*command, protocol::private_message)) {     // private (to one user)
                 // get nickname of recipient
                 std::istringstream iss(*command);
                 std::string recipient;
@@ -93,14 +110,15 @@ void send_messages() {
 
                 // check nickname
                 if (recipient == nickname || !users.contains(recipient)) {
-                    socket->send_line(protocol::invalid_nickname);
+                    socket->send_line("error: " + recipient + " is not online");
                 } else {
                     // send message to recipient
                     std::string message;
                     std::getline(iss, message);
-                    users[recipient]->send_message(nickname + " (PM):" + message);
+                    users[recipient]->send_message( "(PM) " + nickname + ":" + message);
+                    user->send_message("(PM to " + recipient + ") me:" + message);
                 }
-            } else {                                        // public (to all users)
+            } else {                                                        // public (to all users)
                 // send message to all
                 std::string message = nickname + ": " + *command;
                 for (auto& u : users) {
@@ -108,15 +126,18 @@ void send_messages() {
                     u.second->send_message(message);
                 }
                 ul_users.unlock();
+                user->send_message("me: " + *command);
 
                 // add message to last messages
                 std::unique_lock ul_messages(m_messages);
-                if (messages.size() >= MAX_MESSAGES)
+                if (messages.size() >= protocol::max_messages)
                     messages.pop_front();
                 messages.push_back(message);
             }
         }
-        user->logout();
+
+        // logout
+        logout(user);
     }
 }
 
@@ -174,7 +195,7 @@ int main(int argc, char **argv) {
 
         std::unique_lock ul_users(m_users);
         if (users.size() >= MAX_CLIENTS) {
-            s->send_line(protocol::max_users_reached);
+            s->send_line("error: limit of users reached... retry later");
             print("Connection closed by server");
         } else {
             users_login.put(s);

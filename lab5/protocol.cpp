@@ -4,7 +4,8 @@
 
 #include "protocol.h"
 
-const std::string protocol::termination = "/quit";
-const std::string protocol::invalid_nickname = "invalid nickname";
-const std::string protocol::max_users_reached = "maximum number of users reached";
+const std::regex protocol::termination("^/quit$");
+const std::regex protocol::private_message("^/private .+ .+$");
+const std::regex protocol::error("^error.*$");
 const long protocol::max_idle_time = 60;
+const int protocol::max_messages = 32;

@@ -111,6 +111,19 @@ depend:
 .PHONY : depend
 
 #=============================================================================
+# Target rules for targets named client
+
+# Build rule for target.
+client: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 client
+.PHONY : client
+
+# fast build rule for target.
+client/fast:
+	$(MAKE) -f CMakeFiles/client.dir/build.make CMakeFiles/client.dir/build
+.PHONY : client/fast
+
+#=============================================================================
 # Target rules for targets named server
 
 # Build rule for target.
@@ -156,6 +169,7 @@ Socket.o: Socket.cpp.o
 
 # target to build an object file
 Socket.cpp.o:
+	$(MAKE) -f CMakeFiles/client.dir/build.make CMakeFiles/client.dir/Socket.cpp.o
 	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/Socket.cpp.o
 .PHONY : Socket.cpp.o
 
@@ -165,6 +179,7 @@ Socket.i: Socket.cpp.i
 
 # target to preprocess a source file
 Socket.cpp.i:
+	$(MAKE) -f CMakeFiles/client.dir/build.make CMakeFiles/client.dir/Socket.cpp.i
 	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/Socket.cpp.i
 .PHONY : Socket.cpp.i
 
@@ -174,6 +189,7 @@ Socket.s: Socket.cpp.s
 
 # target to generate assembly for a file
 Socket.cpp.s:
+	$(MAKE) -f CMakeFiles/client.dir/build.make CMakeFiles/client.dir/Socket.cpp.s
 	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/Socket.cpp.s
 .PHONY : Socket.cpp.s
 
@@ -204,12 +220,40 @@ User.cpp.s:
 	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/User.cpp.s
 .PHONY : User.cpp.s
 
+client.o: client.cpp.o
+
+.PHONY : client.o
+
+# target to build an object file
+client.cpp.o:
+	$(MAKE) -f CMakeFiles/client.dir/build.make CMakeFiles/client.dir/client.cpp.o
+.PHONY : client.cpp.o
+
+client.i: client.cpp.i
+
+.PHONY : client.i
+
+# target to preprocess a source file
+client.cpp.i:
+	$(MAKE) -f CMakeFiles/client.dir/build.make CMakeFiles/client.dir/client.cpp.i
+.PHONY : client.cpp.i
+
+client.s: client.cpp.s
+
+.PHONY : client.s
+
+# target to generate assembly for a file
+client.cpp.s:
+	$(MAKE) -f CMakeFiles/client.dir/build.make CMakeFiles/client.dir/client.cpp.s
+.PHONY : client.cpp.s
+
 protocol.o: protocol.cpp.o
 
 .PHONY : protocol.o
 
 # target to build an object file
 protocol.cpp.o:
+	$(MAKE) -f CMakeFiles/client.dir/build.make CMakeFiles/client.dir/protocol.cpp.o
 	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/protocol.cpp.o
 .PHONY : protocol.cpp.o
 
@@ -219,6 +263,7 @@ protocol.i: protocol.cpp.i
 
 # target to preprocess a source file
 protocol.cpp.i:
+	$(MAKE) -f CMakeFiles/client.dir/build.make CMakeFiles/client.dir/protocol.cpp.i
 	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/protocol.cpp.i
 .PHONY : protocol.cpp.i
 
@@ -228,6 +273,7 @@ protocol.s: protocol.cpp.s
 
 # target to generate assembly for a file
 protocol.cpp.s:
+	$(MAKE) -f CMakeFiles/client.dir/build.make CMakeFiles/client.dir/protocol.cpp.s
 	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/protocol.cpp.s
 .PHONY : protocol.cpp.s
 
@@ -266,6 +312,7 @@ help:
 	@echo "... depend"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
+	@echo "... client"
 	@echo "... server"
 	@echo "... ServerSocket.o"
 	@echo "... ServerSocket.i"
@@ -276,6 +323,9 @@ help:
 	@echo "... User.o"
 	@echo "... User.i"
 	@echo "... User.s"
+	@echo "... client.o"
+	@echo "... client.i"
+	@echo "... client.s"
 	@echo "... protocol.o"
 	@echo "... protocol.i"
 	@echo "... protocol.s"

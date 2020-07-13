@@ -4,11 +4,12 @@
 
 #pragma once
 
-#include <string>
+#include <regex>
 
 namespace protocol {
-    extern const std::string termination;
-    extern const std::string invalid_nickname;
-    extern const std::string max_users_reached;
+    extern const std::regex termination;
+    extern const std::regex private_message;
+    extern const std::regex error;
     extern const long max_idle_time;
+    extern const int max_messages;
 }

@@ -10,8 +10,8 @@
 #include <cstring>
 #include <unistd.h>
 #include <sys/select.h>
-#include <sys/time.h>
 #include <ctime>
+#include <climits>
 
 const int Socket::invalid_socket = -1;
 
@@ -22,6 +22,15 @@ Socket::Socket() {
     socket_fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (socket_fd < 0)
         throw std::runtime_error("socket() failed");
+}
+
+Socket::Socket(std::string ip_address, int port) : Socket() {
+    remote_address.sin_family = AF_INET;
+    remote_address.sin_port = htons(port);
+    inet_pton(AF_INET, ip_address.c_str(), &remote_address.sin_addr);
+    remote_address_len = sizeof(remote_address);
+    if (::connect(socket_fd, reinterpret_cast<struct sockaddr*>(&remote_address), remote_address_len) < 0)
+        throw std::runtime_error("connect() failed");
 }
 
 Socket::~Socket() {
@@ -62,6 +71,10 @@ std::string Socket::get_remote_address() {
     if (inet_ntop(AF_INET, &remote_address.sin_addr, name, sizeof(name)) == nullptr)
         throw std::logic_error("inet_ntop() failed, remote address not set properly");
     return std::string(name) + ":" + std::to_string(ntohs(remote_address.sin_port));
+}
+
+std::optional<std::string> Socket::receive_line() {
+    return receive_line(LONG_MAX);
 }
 
 std::optional<std::string> Socket::receive_line(long timeout) {

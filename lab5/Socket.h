@@ -23,10 +23,12 @@ public:
     static const int invalid_socket;
 
     Socket();
+    Socket(std::string ip_address, int port);
     Socket(Socket&& other);
     ~Socket();
     Socket& operator=(Socket&& other);
     std::string get_remote_address();
+    std::optional<std::string> receive_line();
     std::optional<std::string> receive_line(long timeout);
     bool send_line(const std::string& line);
 };
