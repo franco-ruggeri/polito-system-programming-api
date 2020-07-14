@@ -28,7 +28,7 @@ public:
     void closeRead();
     void closeWrite();
     bool isClose();
-    static void select(std::vector<Pipe>& pipes);
+    static void select(const std::vector<std::shared_ptr<Pipe>>& pipes);
 };
 
 

@@ -81,26 +81,26 @@ bool Pipe::isClose() {
     return fd[0] == INVALID_FD && fd[1] == INVALID_FD;
 }
 
-void Pipe::select(std::vector<Pipe>& pipes) {
+void Pipe::select(const std::vector<std::shared_ptr<Pipe>>& pipes) {
     fd_set rset, wset;
 
     // prepare sets
     FD_ZERO(&rset);
     FD_ZERO(&wset);
     for (const auto& pipe : pipes) {
-        if (pipe.fd[0] != INVALID_FD)
-            FD_SET(pipe.fd[0], &rset);
-        if (pipe.fd[1] != INVALID_FD)
-            FD_SET(pipe.fd[1], &wset);
+        if (pipe->fd[0] != INVALID_FD)
+            FD_SET(pipe->fd[0], &rset);
+        if (pipe->fd[1] != INVALID_FD)
+            FD_SET(pipe->fd[1], &wset);
     }
 
     // select
     if (::select(FD_SETSIZE, &rset, &wset, NULL, NULL) < 0)
         throw PipeException("select() failed");
     for (auto& pipe : pipes) {
-        if (FD_ISSET(pipe.fd[0], &rset))
-            pipe.readyRead = true;
-        if (FD_ISSET(pipe.fd[1], &wset))
-            pipe.readyWrite = true;
+        if (FD_ISSET(pipe->fd[0], &rset))
+            pipe->readyRead = true;
+        if (FD_ISSET(pipe->fd[1], &wset))
+            pipe->readyWrite = true;
     }
 }

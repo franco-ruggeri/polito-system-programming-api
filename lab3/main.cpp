@@ -125,8 +125,19 @@ std::vector<ResultT> map_reduce_multi_process_multiplexed(std::istream& input, M
     K key;
     std::shared_ptr<char[]> read_ptr;
     std::vector<char> write_v;
-    std::vector<Pipe> pipes(4);     // 0 -> cm, 1 -> mc, 2 -> cr, 3 -> rc
+    std::shared_ptr<Pipe> pipe_cm, pipe_mc, pipe_cr, pipe_rc;
+    std::vector<std::shared_ptr<Pipe>> pipes;
     pid_t pid;
+
+    // create pipes
+    pipe_cm = std::make_shared<Pipe>();
+    pipe_mc = std::make_shared<Pipe>();
+    pipe_cr = std::make_shared<Pipe>();
+    pipe_rc = std::make_shared<Pipe>();
+    pipes.push_back(pipe_cm);
+    pipes.push_back(pipe_mc);
+    pipes.push_back(pipe_cr);
+    pipes.push_back(pipe_rc);
 
     /**********
      * Mapper *
@@ -134,18 +145,18 @@ std::vector<ResultT> map_reduce_multi_process_multiplexed(std::istream& input, M
     pid = fork();
     if (!pid) {
         while (true) {
-            pipes[0].closeWrite();
-            pipes[1].closeRead();
-            pipes[2].close();
-            pipes[3].close();
+            pipe_cm->closeWrite();
+            pipe_mc->closeRead();
+            pipe_cr->close();
+            pipe_rc->close();
 
             try {
-                read_ptr = pipes[0].read();
+                read_ptr = pipe_cm->read();
                 mapper_input.deserializeBinary(read_ptr);
                 mapper_new_results = map_fun(mapper_input);
                 for (const auto& mr : mapper_new_results) {
                     write_v = mr.serializeBinary();
-                    pipes[1].write(write_v);
+                    pipe_mc->write(write_v);
                 }
             } catch (PipeException e) {
                 if (e.isEOF()) std::exit(EXIT_SUCCESS);    // input terminated => all done for the mapper
@@ -162,20 +173,20 @@ std::vector<ResultT> map_reduce_multi_process_multiplexed(std::istream& input, M
     pid = fork();
     if (!pid) {
         while (true) {
-            pipes[0].close();
-            pipes[1].close();
-            pipes[2].closeWrite();
-            pipes[3].closeRead();
+            pipe_cm->close();
+            pipe_mc->close();
+            pipe_cr->closeWrite();
+            pipe_rc->closeRead();
 
             try {
-                read_ptr = pipes[2].read();
+                read_ptr = pipe_cr->read();
                 result.deserializeBinary(read_ptr);
                 key = result.getKey();
                 reducer_input = ReducerInputT(key, result.getValue(), accs[key]);
                 result = reduce_fun(reducer_input);
                 accs[key] = result.getValue();
                 write_v = result.serializeBinary();
-                pipes[3].write(write_v);
+                pipe_rc->write(write_v);
             } catch (PipeException e) {
                 if (e.isEOF()) std::exit(EXIT_SUCCESS);    // input terminated => all done for the reducer
                 else throw;
@@ -188,57 +199,57 @@ std::vector<ResultT> map_reduce_multi_process_multiplexed(std::istream& input, M
     /***************
      * Coordinator *
      ***************/
-    pipes[0].closeRead();
-    pipes[1].closeWrite();
-    pipes[2].closeRead();
-    pipes[3].closeWrite();
+    pipe_cm->closeRead();
+    pipe_mc->closeWrite();
+    pipe_cr->closeRead();
+    pipe_rc->closeWrite();
 
-    while (std::any_of(pipes.begin(), pipes.end(), [](Pipe& p) { return !p.isClose(); })) {
+    while (std::any_of(pipes.begin(), pipes.end(), [](std::shared_ptr<Pipe>& p) { return !p->isClose(); })) {
         Pipe::select(pipes);
 
         // send work to mapper
-        if (pipes[0].isReadyWrite()) {
+        if (pipe_cm->isReadyWrite()) {
             input >> mapper_input;
             if (!input) {
-                pipes[0].close();   // all done for mapper
+                pipe_cm->close();   // all done for mapper
             } else {
                 write_v = mapper_input.serializeBinary();
-                pipes[0].write(write_v);
+                pipe_cm->write(write_v);
             }
         }
 
         // get (one!) result from mapper
-        if (pipes[1].isReadyRead()) {
+        if (pipe_mc->isReadyRead()) {
             try {
-                read_ptr = pipes[1].read();
+                read_ptr = pipe_mc->read();
                 result.deserializeBinary(read_ptr);
                 mapper_results.push(result);
             } catch (PipeException e) {
-                if (e.isEOF()) pipes[1].close();
+                if (e.isEOF()) pipe_mc->close();
                 else throw;
             }
         }
 
         // send work to reducer
-        if (pipes[2].isReadyWrite()) {
+        if (pipe_cr->isReadyWrite()) {
             if (!mapper_results.empty()) {
                 result = mapper_results.front();
                 mapper_results.pop();
                 write_v = result.serializeBinary();
-                pipes[2].write(write_v);
-            } else if (pipes[0].isClose() && pipes[1].isClose()) {
-                pipes[2].close();   // all done for reducer
+                pipe_cr->write(write_v);
+            } else if (pipe_cm->isClose() && pipe_mc->isClose()) {
+                pipe_cr->close();   // all done for reducer
             }
         }
 
         // get result from reducer
-        if (pipes[3].isReadyRead()) {
+        if (pipe_rc->isReadyRead()) {
             try {
-                read_ptr = pipes[3].read();
+                read_ptr = pipe_rc->read();
                 result.deserializeBinary(read_ptr);
                 accs[result.getKey()] = result.getValue();
             } catch (PipeException e) {
-                if (e.isEOF()) pipes[3].close();
+                if (e.isEOF()) pipe_rc->close();
                 else throw;
             }
         }
@@ -293,40 +304,40 @@ int main() {
         std::exit(EXIT_FAILURE);
     }
 
-//    // compare JSON and binary serialization
-//    measure_serialization(input, serialize_json<MapperInput>, deserialize_json<MapperInput>, "JSON serialization");
-//    measure_serialization(input, serialize_binary<MapperInput>, deserialize_binary<MapperInput>, "binary serialization");
-//    std::cout << "\n";
-//
-//    DurationLogger dl("main - MapReduce");
-//
-//    /***************
-//     * Count by ip *
-//     ***************/
+    // compare JSON and binary serialization
+    measure_serialization(input, serialize_json<MapperInput>, deserialize_json<MapperInput>, "JSON serialization");
+    measure_serialization(input, serialize_binary<MapperInput>, deserialize_binary<MapperInput>, "binary serialization");
+    std::cout << "\n";
+
+    DurationLogger dl("main - MapReduce");
+
+    /***************
+     * Count by ip *
+     ***************/
     // reduce for counting
     auto reduce_count = [](const auto& input) {
         return Result(input.getKey(), input.getAcc() + input.getValue());
     };
-//
-//    // prepare file stream
-//    input.clear();
-//    input.seekg(0);
-//
-//    // map
-//    auto map_count_by_ip = [](const MapperInput& mapper_input) {
-//        std::istringstream iss(mapper_input.getInput());
-//        std::string ip;
-//        if (iss >> ip)
-//            return std::vector{Result(ip, 1)};
-//        else
-//            std::exit(EXIT_FAILURE);
-//    };
-//
-//    // run map-reduce
-//    auto count_by_ip = map_reduce_multi_process_multiplexed
-//            <MapperInput, ReducerInput<std::string, int, int>, Result<std::string, int>, std::string, int>
-//            (input, map_count_by_ip, reduce_count);
-//    std::cout << "Count by IP address:\n" << count_by_ip << std::endl;
+
+    // prepare file stream
+    input.clear();
+    input.seekg(0);
+
+    // map
+    auto map_count_by_ip = [](const MapperInput& mapper_input) {
+        std::istringstream iss(mapper_input.getInput());
+        std::string ip;
+        if (iss >> ip)
+            return std::vector{Result(ip, 1)};
+        else
+            std::exit(EXIT_FAILURE);
+    };
+
+    // run map-reduce
+    auto count_by_ip = map_reduce_multi_process_multiplexed
+            <MapperInput, ReducerInput<std::string, int, int>, Result<std::string, int>, std::string, int>
+            (input, map_count_by_ip, reduce_count);
+    std::cout << "Count by IP address:\n" << count_by_ip << std::endl;
 
 
     /*****************
