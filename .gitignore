@@ -1,7 +1,9 @@
 lab*/.idea
 lab*/lab*
 lab*/cmake*
-lab*/CMake*
+lab*/CMakeCache.txt
+lab*/CMakeFiles/
+lab*/Makefile
 lab4/part1
 lab4/part2
 lab5/server
