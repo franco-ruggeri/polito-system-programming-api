@@ -7,9 +7,9 @@
 
 std::shared_ptr<Directory> Directory::root{nullptr};
 
-Directory::Directory(const std::string& name, std::weak_ptr<Directory> parent): Base(name), parent(parent) {}
+Directory::Directory(const std::string& name, std::shared_ptr<Directory> parent): Base(name), parent(parent) {}
 
-std::shared_ptr<Directory> Directory::makeDirectory(const std::string& name, std::weak_ptr<Directory> parent) {
+std::shared_ptr<Directory> makeDirectory(const std::string& name, std::shared_ptr<Directory> parent) {
     std::shared_ptr<Directory> dir{new Directory(name, parent)};
     dir->self = dir;
     return dir;
@@ -54,7 +54,7 @@ std::shared_ptr<File> Directory::getFile(const std::string &name) const {
 std::shared_ptr<Directory> Directory::addDirectory(const std::string& name) {
     if (name == "." || name == ".." || children.find(name) != children.end())
         return nullptr;
-    auto child = Directory::makeDirectory(name, this->self);
+    auto child = makeDirectory(name, this->self.lock());
     children.insert(std::make_pair(name, child));
     return child;
 }

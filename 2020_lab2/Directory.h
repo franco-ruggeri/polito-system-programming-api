@@ -18,10 +18,10 @@ class Directory: public Base {
     static const int TYPE = 0;
 
     bool check_name(const std::string &name) const;
-    Directory(const std::string& name, std::weak_ptr<Directory> parent);
+    Directory(const std::string& name, std::shared_ptr<Directory> parent);
+    friend std::shared_ptr<Directory> makeDirectory(const std::string& name, std::shared_ptr<Directory> parent);
 
 public:
-    static std::shared_ptr<Directory> makeDirectory(const std::string& name, std::weak_ptr<Directory> parent);
     static std::shared_ptr<Directory> getRoot();
 
     int mType() const override;
