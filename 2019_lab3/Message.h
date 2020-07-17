@@ -9,12 +9,12 @@
 
 class SharedEditor;
 
+enum class MessageType {
+    insert, erase
+};
+
 class Message {
 public:
-    typedef enum {
-        insert, erase
-    } MessageType;
-
     Message(std::shared_ptr<SharedEditor> source, Symbol symbol, MessageType type);
     std::shared_ptr<SharedEditor> get_source() const;
     MessageType get_type() const;

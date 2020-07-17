@@ -22,13 +22,13 @@ void SharedEditor::local_insert(int index, char value) {
     std::vector<int> between_pos = pos_allocator.get_between(prev_pos, next_pos);
     Symbol symbol(value, site_id, site_counter++, between_pos);
     symbols.insert(symbols.begin()+index, symbol);
-    server.send(Message(self.lock(), symbol, Message::insert));
+    server.send(Message(self.lock(), symbol, MessageType::insert));
 }
 
 void SharedEditor::local_erase(int index) {
     Symbol symbol = symbols.at(index);
     symbols.erase(symbols.begin() + index);
-    server.send(Message(self.lock(), symbol, Message::erase));
+    server.send(Message(self.lock(), symbol, MessageType::erase));
 }
 
 void SharedEditor::remote_insert(const Message &message) {
@@ -46,10 +46,10 @@ void SharedEditor::remote_erase(const Message &message) {
 
 void SharedEditor::process(const Message &message) {
     switch (message.get_type()) {
-        case Message::insert:
+        case MessageType::insert:
             remote_insert(message);
             break;
-        case Message::erase:
+        case MessageType::erase:
             remote_erase(message);
             break;
         default:

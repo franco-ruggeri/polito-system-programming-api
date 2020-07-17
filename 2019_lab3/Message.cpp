@@ -11,7 +11,7 @@ std::shared_ptr<SharedEditor> Message::get_source() const {
     return source;
 }
 
-Message::MessageType Message::get_type() const {
+MessageType Message::get_type() const {
     return type;
 }
 
