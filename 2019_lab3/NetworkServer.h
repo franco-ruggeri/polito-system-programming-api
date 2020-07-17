@@ -14,6 +14,7 @@ class NetworkServer {
     std::vector<std::shared_ptr<SharedEditor>> editors;
     std::queue<Message> messages;
     static int next_editor_id;
+
 public:
     int connect(std::shared_ptr<SharedEditor> shared_editor);
     void disconnect(std::shared_ptr<SharedEditor> shared_editor);

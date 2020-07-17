@@ -1,5 +1,6 @@
 20*_lab*/.idea
 20*_lab*/lab*
+20*_lab*/*.cbp
 20*_lab*/cmake*
 20*_lab*/CMakeCache.txt
 20*_lab*/CMakeFiles/
