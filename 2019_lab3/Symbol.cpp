@@ -22,3 +22,12 @@ int Symbol::get_site_id() const {
 int Symbol::get_site_counter() const {
     return site_counter;
 }
+
+bool Symbol::operator<(const Symbol& other) {
+    return this->position < other.position || (this->position == other.position && this->site_id < other.site_id);
+}
+
+bool Symbol::operator==(const Symbol &other) {
+    return this->site_id == other.site_id && this->site_counter == other.site_counter &&
+            this->position == other.position;
+}

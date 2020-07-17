@@ -9,6 +9,7 @@
 #include <memory>
 #include "Symbol.h"
 #include "Message.h"
+#include "LSEQ.h"
 
 class NetworkServer;
 
@@ -18,7 +19,10 @@ class SharedEditor {
     int site_id;
     int site_counter;
     std::vector<Symbol> symbols;
+    LSEQ pos_allocator;
     SharedEditor(NetworkServer& server);                                                // named constructor idiom
+    void remote_insert(const Message& message);
+    void remote_erase(const Message& message);
 public:
     static std::shared_ptr<SharedEditor> make_shared_editor(NetworkServer& server);     // named constructor idiom
     void local_insert(int index, char value);
