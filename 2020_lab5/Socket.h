@@ -30,7 +30,7 @@ public:
     std::string get_remote_address();
     std::optional<std::string> receive_line();
     std::optional<std::string> receive_line(long timeout);
-    bool send_line(const std::string& line);
+    void send_line(const std::string& line);
 };
 
 

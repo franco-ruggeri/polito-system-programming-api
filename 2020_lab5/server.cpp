@@ -15,15 +15,15 @@
 
 #define MAX_CLIENTS 32
 
-Jobs<std::shared_ptr<Socket>> users_login;
-Jobs<std::shared_ptr<User>> users_receive;
+Jobs<std::shared_ptr<Socket>> users_login(MAX_CLIENTS);
+Jobs<std::shared_ptr<User>> users_receive(MAX_CLIENTS);
 std::unordered_map<std::string,std::shared_ptr<User>> users;
 std::list<std::string> messages;
 std::mutex m_output, m_users, m_messages;
 
 void print(std::string msg) {
     std::lock_guard lg(m_output);
-    std::cout << msg << std::endl;
+    std::clog << msg << std::endl;
 }
 
 std::optional<std::shared_ptr<User>> login(std::shared_ptr<Socket> socket) {
@@ -34,7 +34,7 @@ std::optional<std::shared_ptr<User>> login(std::shared_ptr<Socket> socket) {
     // check nickname
     std::unique_lock ul_users(m_users);
     if (users.contains(*nickname) || nickname->find(' ') != std::string::npos) {
-        socket->send_line("error: invalid nickname (already used or with spaces)");
+        socket->send_line("[error] invalid nickname (already used or with spaces)");
         return std::nullopt;
     }
 
@@ -67,8 +67,8 @@ std::optional<std::shared_ptr<User>> login(std::shared_ptr<Socket> socket) {
 
 void logout(std::shared_ptr<User> user) {
     user->logout();
-    std::lock_guard lg(m_users);
     std::string nickname = user->get_nickname();
+    std::lock_guard lg(m_users);
     users.erase(nickname);
     for (const auto& u : users)
         u.second->send_message("[info] " + nickname + " logged out");
@@ -76,79 +76,86 @@ void logout(std::shared_ptr<User> user) {
 
 // service: send messages to other users (+ login and logout)
 void send_messages() {
-    print("New sender - Hello world!");
+    print("new sender - hello world!");
 
     while (true) {
-        // login
-        std::shared_ptr<Socket> socket = *users_login.get();
-        std::optional<std::shared_ptr<User>> opt_u = login(socket);
-        if (!opt_u) continue;
-        std::shared_ptr<User> user = *opt_u;
-        std::string nickname = user->get_nickname();
+        std::shared_ptr<User> user;
 
-        // launch receive service
-        users_receive.put(user);
+        try {
+            // login
+            std::shared_ptr<Socket> socket = *users_login.get();
+            std::optional<std::shared_ptr<User>> opt_u = login(socket);
+            if (!opt_u) continue;
+            user = *opt_u;
+            std::string nickname = user->get_nickname();
 
-        while (true) {
-            // receive command from user
-            std::optional<std::string> command = socket->receive_line(protocol::max_idle_time);
+            // launch receive service
+            users_receive.put(user);
 
-            // connection closed by client or timeout or correct termination => close socket => serve to next user
-            if (!command || std::regex_match(*command, protocol::termination)) break;
+            while (true) {
+                // receive command from user
+                std::optional<std::string> command = socket->receive_line(protocol::max_idle_time);
 
-            // empty command => skip
-            if (command->empty()) continue;
+                // connection closed by client or timeout or correct termination => close socket => serve next user
+                if (!command || std::regex_match(*command, protocol::termination)) break;
 
-            // send message to other user(s) (produce)
-            std::unique_lock ul_users(m_users);
-            if (std::regex_match(*command, protocol::private_message)) {     // private (to one user)
-                // get nickname of recipient
-                std::istringstream iss(*command);
-                std::string recipient;
-                iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
-                iss >> recipient;
+                // empty command => skip
+                if (command->empty()) continue;
 
-                // check nickname
-                if (recipient == nickname || !users.contains(recipient)) {
-                    socket->send_line("error: " + recipient + " is not online");
-                } else {
-                    // send message to recipient
-                    std::string message;
-                    std::getline(iss, message);
-                    users[recipient]->send_message( "(PM) " + nickname + ":" + message);
-                    user->send_message("(PM to " + recipient + ") me:" + message);
+                // send message to other user(s) (produce)
+                std::unique_lock ul_users(m_users);
+                if (std::regex_match(*command, protocol::private_message)) {     // private (to one user)
+                    // get nickname of recipient
+                    std::istringstream iss(*command);
+                    std::string recipient;
+                    iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
+                    iss >> recipient;
+
+                    // check nickname
+                    if (recipient == nickname || !users.contains(recipient)) {
+                        socket->send_line("[error] " + recipient + " is not online");
+                    } else {
+                        // send message to recipient
+                        std::string message;
+                        std::getline(iss, message);
+                        users[recipient]->send_message("(PM) " + nickname + ":" + message);
+                        user->send_message("(PM to " + recipient + ") me:" + message);
+                    }
+                } else {                                                        // public (to all users)
+                    // send message to all
+                    std::string message = nickname + ": " + *command;
+                    for (auto &u : users) {
+                        if (u.second == user) continue;
+                        u.second->send_message(message);
+                    }
+                    ul_users.unlock();
+                    user->send_message("me: " + *command);
+
+                    // add message to last messages
+                    std::unique_lock ul_messages(m_messages);
+                    if (messages.size() >= protocol::max_messages)
+                        messages.pop_front();
+                    messages.push_back(message);
                 }
-            } else {                                                        // public (to all users)
-                // send message to all
-                std::string message = nickname + ": " + *command;
-                for (auto& u : users) {
-                    if (u.second == user) continue;
-                    u.second->send_message(message);
-                }
-                ul_users.unlock();
-                user->send_message("me: " + *command);
-
-                // add message to last messages
-                std::unique_lock ul_messages(m_messages);
-                if (messages.size() >= protocol::max_messages)
-                    messages.pop_front();
-                messages.push_back(message);
             }
+        } catch (std::runtime_error e) {
+            // error in send (most probably broken pipe due to connection closed by client)
+            // logout the user and serve next one
         }
 
         // logout
-        logout(user);
+        if (user) logout(user);
     }
 }
 
 // service: receive messages from other users
 void receive_messages() {
-    print("New receiver - Hello world!");
+    print("new receiver - hello world!");
 
     while (true) {
         // get user
         std::optional<std::shared_ptr<User>> opt_u = users_receive.get();
-        if (!opt_u) throw std::logic_error("Error: optional does not contain user, in receiver");
+        if (!opt_u) throw std::logic_error("error: optional does not contain user, in receiver");
         std::shared_ptr<User> user = *opt_u;
         std::shared_ptr<Socket> socket = user->get_socket();
 
@@ -158,20 +165,31 @@ void receive_messages() {
             if (!message) break;      // user logged out
 
             // send message to user (consume)
-            socket->send_line(*message);
+            try {
+                socket->send_line(*message);
+            } catch (std::runtime_error e) {
+                // error in send (most probably broken pipe due to connection closed by client)
+                // just serve next user
+                break;
+            }
         }
     }
 }
 
 int main(int argc, char **argv) {
+    const std::string usage = std::string{} + "usage: " + argv[0] + " port";
+
     if (argc < 2) {
-        std::cerr << "usage: " << argv[0] << " port" << std::endl;
+        std::cerr << usage << std::endl;
         std::exit(EXIT_FAILURE);
     }
 
-    int port = atoi(argv[1]);
-    if (!port) {
+    int port;
+    try {
+        port = std::stoi(argv[1]);
+    } catch (std::invalid_argument e) {
         std::cerr << "invalid port" << std::endl;
+        std::cerr << usage << std::endl;
         std::exit(EXIT_FAILURE);
     }
 
@@ -190,15 +208,19 @@ int main(int argc, char **argv) {
     // accept sockets
     ServerSocket ss(port);
     while (true) {
-        std::shared_ptr<Socket> s = ss.accept();
-        print("Connection accepted from " + s->get_remote_address());
+        std::shared_ptr<Socket> s;
 
-        std::unique_lock ul_users(m_users);
-        if (users.size() >= MAX_CLIENTS) {
-            s->send_line("error: limit of users reached... retry later");
-            print("Connection closed by server");
-        } else {
-            users_login.put(s);
+        // accept connection
+        try {
+            s = ss.accept();
+        } catch (std::runtime_error e) {
+            print(e.what());
+            continue;
         }
+
+        // serve connection (concurrently)
+        std::unique_lock ul_users(m_users);
+        users_login.put(s);
+        print("connection accepted from " + s->get_remote_address());
     }
 }

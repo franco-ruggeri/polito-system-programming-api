@@ -14,8 +14,7 @@
 
 std::list<std::string> messages;
 std::string command;
-bool io_event = false;
-bool terminate = false;
+bool io_event=false, terminate_now=false, terminate_after_key=false;
 std::mutex m_console;
 std::condition_variable cv_console;
 
@@ -25,7 +24,7 @@ void refresh_console() {
 
         // wait I/O event
         cv_console.wait(ul, []() { return io_event; });
-        if (terminate) break;
+        if (terminate_now) break;
         io_event = false;
 
         // update screen
@@ -46,11 +45,13 @@ void login(std::shared_ptr<Socket> socket, std::string nickname) {
     while (true) {
         std::optional<std::string> message = socket->receive_line();
         if (!message || std::regex_match(*message, protocol::error)) {
-            std::cerr << message.value_or("connection error") << std::endl;
-            std::exit(EXIT_FAILURE);
-        } else if (message->empty()) {
-            break;
+            std::cerr << "diocane" << std::endl;
+            std::cerr << *message << std::endl;
+            std::cerr << std::regex_match(*message, protocol::error) << std::endl;
+            throw std::runtime_error(message.value_or("connection error"));
         }
+        else if (message->empty())
+            break;
         messages.push_back(*message + "\n");
     }
 
@@ -65,27 +66,34 @@ void send_messages(std::shared_ptr<Socket> socket) {
     while (true) {
         char c = getch();
         std::lock_guard lg(m_console);
-        if (c == '\n') {        // end of command
+        if (terminate_after_key) {
+            terminate_now = true;
+        } else if (c == '\n') {         // end of command
             socket->send_line(command);
-            if (std::regex_match(command, protocol::termination)) break;
+            if (std::regex_match(command, protocol::termination)) terminate_now = true;
             command.clear();
-        } else if (c == 127) {  // delete character
+        } else if (c == 127) {          // delete character
             if (!command.empty())
                 command.pop_back();
-        } else {
+        } else {                        // insert character
             command.push_back(c);
         }
         io_event = true;
         cv_console.notify_one();
+        if (terminate_now) break;
     }
 }
 
 // service: receive messages from other users
 void receive_messages(std::shared_ptr<Socket> socket) {
-    while (true) {
+    bool terminate_receive = false;
+    while (!terminate_receive) {
         std::optional<std::string> message;
         message = socket->receive_line();
-        if (!message) return;   // connection closed
+        if (!message) {
+            message = "[info] disconnected by the server, press a key to end";
+            terminate_after_key = terminate_receive = true;
+        }
         std::lock_guard lg(m_console);
         if (messages.size() >= protocol::max_messages)
             messages.pop_front();
@@ -100,17 +108,31 @@ void close_console() {
 }
 
 int main(int argc, char **argv) {
+    const std::string usage = std::string{} + "usage: " + argv[0] + " ip_address port nickname";
+
     if (argc < 4) {
-        std::cerr << "usage: " << argv[0] << " ip_address port nickname" << std::endl;
+        std::cerr << usage << std::endl;
         std::exit(EXIT_FAILURE);
     }
 
     // parse arguments
     std::string ip_address = argv[1];
     std::string nickname = argv[3];
-    int port = atoi(argv[2]);
-    if (!port) {
+    int port;
+    try {
+        port = std::stoi(argv[2]);
+    } catch (std::invalid_argument e) {
         std::cerr << "invalid port" << std::endl;
+        std::cerr << usage << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    // connect to the server
+    std::shared_ptr<Socket> socket;
+    try {
+        socket = std::make_shared<Socket>(ip_address, port);
+    } catch (std::runtime_error e) {
+        std::cerr << "[info] server down" << std::endl;
         std::exit(EXIT_FAILURE);
     }
 
@@ -121,9 +143,6 @@ int main(int argc, char **argv) {
     refresh();
     std::atexit(close_console);
 
-    // connect to the server
-    std::shared_ptr<Socket> socket = std::make_shared<Socket>(ip_address, port);
-
     // login and chat
     login(socket, nickname);
     std::thread refresher(refresh_console);
@@ -132,10 +151,6 @@ int main(int argc, char **argv) {
 
     // terminate
     sender.join();
-    std::unique_lock ul(m_console);
-    io_event = terminate = true;
-    cv_console.notify_one();
-    ul.unlock();
     receiver.join();
     refresher.join();
 }

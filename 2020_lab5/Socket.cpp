@@ -12,6 +12,7 @@
 #include <sys/select.h>
 #include <ctime>
 #include <climits>
+#include <iostream>
 
 const int Socket::invalid_socket = -1;
 
@@ -27,8 +28,9 @@ Socket::Socket() {
 Socket::Socket(std::string ip_address, int port) : Socket() {
     remote_address.sin_family = AF_INET;
     remote_address.sin_port = htons(port);
-    inet_pton(AF_INET, ip_address.c_str(), &remote_address.sin_addr);
     remote_address_len = sizeof(remote_address);
+    if (::inet_pton(AF_INET, ip_address.c_str(), &remote_address.sin_addr) <= 0)
+        throw std::runtime_error("inet_pton() failed");
     if (::connect(socket_fd, reinterpret_cast<struct sockaddr*>(&remote_address), remote_address_len) < 0)
         throw std::runtime_error("connect() failed");
 }
@@ -116,7 +118,7 @@ std::optional<std::string> Socket::receive_line(long timeout) {
     return line;
 }
 
-bool Socket::send_line(const std::string& msg) {
+void Socket::send_line(const std::string& msg) {
     std::string line = msg + '\n';
     const char *ptr = line.c_str();
     size_t n_left = line.size();
@@ -126,11 +128,9 @@ bool Socket::send_line(const std::string& msg) {
         n_written = ::send(socket_fd, ptr, n_left, MSG_NOSIGNAL);     // for SIGPIPE
         if (n_written < 0) {
             if (errno == EINTR) continue;   // interrupted by signal, repeat
-            else if (errno == EPIPE) return false;
             else throw std::runtime_error("send() failed");
         }
         n_left -= n_written;
         ptr += n_written;
     }
-    return true;
 }
