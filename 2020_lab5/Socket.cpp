@@ -12,7 +12,6 @@
 #include <sys/select.h>
 #include <ctime>
 #include <climits>
-#include <iostream>
 
 const int Socket::invalid_socket = -1;
 
@@ -68,7 +67,7 @@ void Socket::close() {
     }
 }
 
-std::string Socket::get_remote_address() {
+std::string Socket::get_remote_address() const {
     char name[16];
     if (inet_ntop(AF_INET, &remote_address.sin_addr, name, sizeof(name)) == nullptr)
         throw std::logic_error("inet_ntop() failed, remote address not set properly");

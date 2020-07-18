@@ -27,7 +27,7 @@ public:
     Socket(Socket&& other);
     ~Socket();
     Socket& operator=(Socket&& other);
-    std::string get_remote_address();
+    std::string get_remote_address() const;
     std::optional<std::string> receive_line();
     std::optional<std::string> receive_line(long timeout);
     void send_line(const std::string& line);

@@ -4,21 +4,24 @@
 
 #include <iostream>
 #include <unordered_map>
-#include <list>
 #include <thread>
 #include <mutex>
-#include <regex>
-#include "protocol.h"
 #include "ServerSocket.h"
 #include "Jobs.h"
 #include "User.h"
+#include "Message.h"
+#include "Messages.h"
 
 #define MAX_CLIENTS 32
+#define MAX_IDLE_TIME 60
+#define MAX_MESSAGES 32
+
+// TODO: code refactor (comments, declaration at the beginning, more functions)
 
 Jobs<std::shared_ptr<Socket>> users_login(MAX_CLIENTS);
 Jobs<std::shared_ptr<User>> users_receive(MAX_CLIENTS);
 std::unordered_map<std::string,std::shared_ptr<User>> users;
-std::list<std::string> messages;
+Messages messages(MAX_MESSAGES);
 std::mutex m_output, m_users, m_messages;
 
 void print(std::string msg) {
@@ -26,41 +29,50 @@ void print(std::string msg) {
     std::clog << msg << std::endl;
 }
 
-std::optional<std::shared_ptr<User>> login(std::shared_ptr<Socket> socket) {
+std::shared_ptr<User> login(std::shared_ptr<Socket> socket) {
+    Message message;
+    std::optional<std::string> opt_m;
+    std::string nickname;
+
     // receive nickname
-    std::optional<std::string> nickname = socket->receive_line(protocol::max_idle_time);
-    if (!nickname) return std::nullopt;     // connection closed by client or timeout
+    opt_m = socket->receive_line(MAX_IDLE_TIME);
+    if (!opt_m) throw std::runtime_error("connection error");
+    message = make_message_from_network(*opt_m);
+    if (message.get_type() != MessageType::login) throw std::logic_error("expected login");
+    nickname = message.get_message();
 
     // check nickname
     std::unique_lock ul_users(m_users);
-    if (users.contains(*nickname) || nickname->find(' ') != std::string::npos) {
-        socket->send_line("[error] invalid nickname (already used or with spaces)");
-        return std::nullopt;
+    if (users.contains(nickname)) {
+        message = Message(MessageType::error, "nickname already used");
+        socket->send_line(message.to_network());
+        throw std::runtime_error("nickname already used");
     }
 
     // create and add user
-    std::shared_ptr<User> user = std::make_shared<User>(socket, *nickname);
-    users[*nickname] = user;
+    std::shared_ptr<User> user = std::make_shared<User>(socket, nickname);
+    users[nickname] = user;
 
     // send online users and login message
-    std::string message = "[info] " + *nickname + " is now online";
+    message = Message(MessageType::login, nickname);
     std::ostringstream oss;
-    oss << "[info] " << (users.size() == 1 ? "nobody online" : "online users:");
     for (const auto& u : users) {
         if (u.second != user) {
             u.second->send_message(message);
-            oss << " " << u.first;
+            oss << u.first << " ";
         }
     }
     ul_users.unlock();
-    socket->send_line(oss.str());
+    message = Message(MessageType::online_users, oss.str());
+    socket->send_line(message.to_network());
 
     // send last messages
     std::unique_lock ul_messages(m_messages);
     for (const auto& m : messages)
-        socket->send_line(m);
+        socket->send_line(m.to_network());
     ul_messages.unlock();
-    socket->send_line("");  // empty line => end of last messages
+    message = Message(MessageType::done_last_messages);
+    socket->send_line(message.to_network());
 
     return user;
 }
@@ -70,8 +82,41 @@ void logout(std::shared_ptr<User> user) {
     std::string nickname = user->get_nickname();
     std::lock_guard lg(m_users);
     users.erase(nickname);
+    Message message(MessageType::logout, nickname);
     for (const auto& u : users)
-        u.second->send_message("[info] " + nickname + " logged out");
+        u.second->send_message(message);
+}
+
+void send_private_message(std::shared_ptr<User> user, Message message) {
+    std::unique_lock ul_users(m_users);
+
+    // check message
+    std::string destination = message.get_destination();
+    std::string source = message.get_source();
+    if (destination == source)
+        message = Message(MessageType::error, "you cannot send PM to yourself");
+    else if (source != user->get_nickname())
+        message = Message(MessageType::error, "no source spoofing thanks ;)");
+    else if (!users.contains(destination))
+        message = Message(MessageType::error, destination + " is not online");
+
+    // send message
+    MessageType type = message.get_type();
+    if (type == MessageType::error) user->send_message(message);
+    else users[destination]->send_message(message);
+}
+
+void send_public_message(std::shared_ptr<User> user, const Message& message) {
+    // send to all users
+    std::unique_lock ul_users(m_users);
+    for (auto &u : users)
+        if (u.second != user)
+            u.second->send_message(message);
+    ul_users.unlock();
+
+    // add message to last messages
+    std::unique_lock ul_messages(m_messages);
+    messages.push(message);
 }
 
 // service: send messages to other users (+ login and logout)
@@ -84,63 +129,39 @@ void send_messages() {
         try {
             // login
             std::shared_ptr<Socket> socket = *users_login.get();
-            std::optional<std::shared_ptr<User>> opt_u = login(socket);
-            if (!opt_u) continue;
-            user = *opt_u;
+            user = login(socket);
             std::string nickname = user->get_nickname();
 
             // launch receive service
             users_receive.put(user);
 
-            while (true) {
+            bool next = false;
+            while (!next) {
                 // receive command from user
-                std::optional<std::string> command = socket->receive_line(protocol::max_idle_time);
+                std::optional<std::string> opt_m = socket->receive_line(MAX_IDLE_TIME);
+                if (!opt_m) break;
+                Message message = make_message_from_network(*opt_m);
+                MessageType type = message.get_type();
 
-                // connection closed by client or timeout or correct termination => close socket => serve next user
-                if (!command || std::regex_match(*command, protocol::termination)) break;
-
-                // empty command => skip
-                if (command->empty()) continue;
-
-                // send message to other user(s) (produce)
-                std::unique_lock ul_users(m_users);
-                if (std::regex_match(*command, protocol::private_message)) {     // private (to one user)
-                    // get nickname of recipient
-                    std::istringstream iss(*command);
-                    std::string recipient;
-                    iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
-                    iss >> recipient;
-
-                    // check nickname
-                    if (recipient == nickname || !users.contains(recipient)) {
-                        socket->send_line("[error] " + recipient + " is not online");
-                    } else {
-                        // send message to recipient
-                        std::string message;
-                        std::getline(iss, message);
-                        users[recipient]->send_message("(PM) " + nickname + ":" + message);
-                        user->send_message("(PM to " + recipient + ") me:" + message);
-                    }
-                } else {                                                        // public (to all users)
-                    // send message to all
-                    std::string message = nickname + ": " + *command;
-                    for (auto &u : users) {
-                        if (u.second == user) continue;
-                        u.second->send_message(message);
-                    }
-                    ul_users.unlock();
-                    user->send_message("me: " + *command);
-
-                    // add message to last messages
-                    std::unique_lock ul_messages(m_messages);
-                    if (messages.size() >= protocol::max_messages)
-                        messages.pop_front();
-                    messages.push_back(message);
+                switch (type) {
+                    case MessageType::quit:
+                        next = true;
+                        break;
+                    case MessageType::private_message:
+                        send_private_message(user, message);
+                        break;
+                    case MessageType::public_message:
+                        send_public_message(user, message);
+                        break;
+                    default:
+                        message = Message(MessageType::error, "wrong type");
+                        next = true;
+                        break;
                 }
             }
-        } catch (std::runtime_error e) {
-            // error in send (most probably broken pipe due to connection closed by client)
-            // logout the user and serve next one
+        } catch (...) {
+            // error (e.g. broken pipe due to connection closed by client or protocol not respected by client)
+            // nothing to do here... logout the user and serve next one
         }
 
         // logout
@@ -154,22 +175,21 @@ void receive_messages() {
 
     while (true) {
         // get user
-        std::optional<std::shared_ptr<User>> opt_u = users_receive.get();
-        if (!opt_u) throw std::logic_error("error: optional does not contain user, in receiver");
-        std::shared_ptr<User> user = *opt_u;
+        std::shared_ptr<User> user = *users_receive.get();
         std::shared_ptr<Socket> socket = user->get_socket();
 
         while (true) {
             // receive message from other user
-            std::optional<std::string> message = user->receive_message();
-            if (!message) break;      // user logged out
+            std::optional<Message> opt_m = user->receive_message();
+            if (!opt_m) break;      // user logged out
+            Message message = *opt_m;
 
-            // send message to user (consume)
+            // send message to user
             try {
-                socket->send_line(*message);
-            } catch (std::runtime_error e) {
-                // error in send (most probably broken pipe due to connection closed by client)
-                // just serve next user
+                socket->send_line(message.to_network());
+            } catch (...) {
+                // error (e.g. broken pipe due to connection closed by client or protocol not respected by client)
+                // nothing to do here... just serve next user
                 break;
             }
         }

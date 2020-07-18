@@ -14,11 +14,11 @@ std::string User::get_nickname() {
     return nickname;
 }
 
-void User::send_message(const std::string& message) {
+void User::send_message(const Message& message) {
     incoming_messages.put(message);
 }
 
-std::optional<std::string> User::receive_message() {
+std::optional<Message> User::receive_message() {
     return incoming_messages.get();
 }
 
