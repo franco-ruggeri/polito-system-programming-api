@@ -1,6 +1,6 @@
-//
-// Created by fruggeri on 7/17/20.
-//
+/*
+ * Author: Franco Ruggeri
+ */
 
 #include "Message.h"
 
@@ -70,7 +70,6 @@ std::string Message::to_console() const {
         default:
             throw std::logic_error("to_console() used with wrong type");
     }
-    m += '\n';
     return m;
 }
 

@@ -1,6 +1,8 @@
-//
-// Created by fruggeri on 7/18/20.
-//
+/*
+ * Message types for the chat room application protocol.
+ *
+ * Author: Franco Ruggeri
+ */
 
 #pragma once
 

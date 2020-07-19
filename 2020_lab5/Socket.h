@@ -1,6 +1,8 @@
-//
-// Created by fruggeri on 7/9/20.
-//
+/*
+ * Stream socket.
+ *
+ * Author: Franco Ruggeri
+ */
 
 #pragma once
 
@@ -22,15 +24,15 @@ class Socket {
 public:
     static const int invalid_socket;
 
-    Socket();
-    Socket(std::string ip_address, int port);
+    Socket();                                   // open socket
+    Socket(std::string ip_address, int port);   // open and connect socket
     Socket(Socket&& other);
     ~Socket();
     Socket& operator=(Socket&& other);
     std::string get_remote_address() const;
     std::optional<std::string> receive_line();
     std::optional<std::string> receive_line(long timeout);
-    void send_line(const std::string& line);
+    void send_line(const std::string& message);
 };
 
 

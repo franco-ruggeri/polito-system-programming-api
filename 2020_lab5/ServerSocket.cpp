@@ -1,6 +1,6 @@
-//
-// Created by fruggeri on 7/9/20.
-//
+/*
+ * Author: Franco Ruggeri
+ */
 
 #include "ServerSocket.h"
 #include <sys/socket.h>

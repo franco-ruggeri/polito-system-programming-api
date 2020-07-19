@@ -1,6 +1,8 @@
-//
-// Created by fruggeri on 7/9/20.
-//
+/*
+ * User participating in the chat room.
+ *
+ * Author: Franco Ruggeri
+ */
 
 #pragma once
 
@@ -14,15 +16,13 @@
 class User {
     std::shared_ptr<Socket> socket;
     std::string nickname;
-    Jobs<Message> incoming_messages;
+    Jobs<Message> inbox;
 
 public:
     User(std::shared_ptr<Socket> socket, std::string nickname);
     std::shared_ptr<Socket> get_socket();
     std::string get_nickname();
-    void send_message(const Message& message);
-    std::optional<Message> receive_message();
+    void send_message(const Message& message);  // put the message in the user's inbox
+    std::optional<Message> receive_message();   // get a message from the user's inbox
     void logout();
 };
-
-

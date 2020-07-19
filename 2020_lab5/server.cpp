@@ -1,148 +1,186 @@
-//
-// Created by fruggeri on 7/13/20.
-//
+/*
+ * Concurrent server for chat room. It uses 4 thread pools:
+ * - Login: logs in connecting user.
+ * - Send: send messages from user to the others.
+ * - Receive: receive messages from others.
+ * - Logout: logs out disconnected user.
+ *
+ * Since thread pools are used, there is a maximum number of online users.
+ * The settings are indicative and should be tuned accordingly to the available resources.
+ *
+ * Author: Franco Ruggeri
+ */
 
 #include <iostream>
 #include <unordered_map>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 #include "ServerSocket.h"
 #include "Jobs.h"
 #include "User.h"
 #include "Message.h"
 #include "Messages.h"
 
+#define N_LOGIN_THREADS 2
+#define N_LOGOUT_THREADS 1
 #define MAX_CLIENTS 32
 #define MAX_IDLE_TIME 60
 #define MAX_MESSAGES 32
 
-// TODO: code refactor (comments, declaration at the beginning, more functions)
+// TODO: completa refactor in client (comments, Console class, more functions)
+// namespace + underscore
+// struttura progetto
+// commenta classi
 
-Jobs<std::shared_ptr<Socket>> users_login(MAX_CLIENTS);
-Jobs<std::shared_ptr<User>> users_receive(MAX_CLIENTS);
-std::unordered_map<std::string,std::shared_ptr<User>> users;
-Messages messages(MAX_MESSAGES);
-std::mutex m_output, m_users, m_messages;
+Jobs<std::shared_ptr<Socket>> users_login(MAX_CLIENTS);         // producer=main, consumer=login
+Jobs<std::shared_ptr<User>> users_send(MAX_CLIENTS);            // producer=login, consumer=send
+Jobs<std::shared_ptr<User>> users_receive(MAX_CLIENTS);         // producer=login, consumer=receive
+Jobs<std::shared_ptr<User>> users_logout(MAX_CLIENTS);          // producer=send, consumer=logout
+std::unordered_map<std::string,std::shared_ptr<User>> online_users;
+Messages last_messages(MAX_MESSAGES);
+std::mutex m_log, m_users, m_messages;
+std::condition_variable cv_users;
 
-void print(std::string msg) {
-    std::lock_guard lg(m_output);
+void log(std::string msg) {
+    std::lock_guard lg(m_log);
     std::clog << msg << std::endl;
 }
 
-std::shared_ptr<User> login(std::shared_ptr<Socket> socket) {
-    Message message;
-    std::optional<std::string> opt_m;
-    std::string nickname;
-
-    // receive nickname
-    opt_m = socket->receive_line(MAX_IDLE_TIME);
-    if (!opt_m) throw std::runtime_error("connection error");
-    message = make_message_from_network(*opt_m);
-    if (message.get_type() != MessageType::login) throw std::logic_error("expected login");
-    nickname = message.get_message();
-
-    // check nickname
-    std::unique_lock ul_users(m_users);
-    if (users.contains(nickname)) {
-        message = Message(MessageType::error, "nickname already used");
-        socket->send_line(message.to_network());
-        throw std::runtime_error("nickname already used");
-    }
-
-    // create and add user
-    std::shared_ptr<User> user = std::make_shared<User>(socket, nickname);
-    users[nickname] = user;
-
-    // send online users and login message
-    message = Message(MessageType::login, nickname);
-    std::ostringstream oss;
-    for (const auto& u : users) {
-        if (u.second != user) {
-            u.second->send_message(message);
-            oss << u.first << " ";
-        }
-    }
-    ul_users.unlock();
-    message = Message(MessageType::online_users, oss.str());
+void send_error(std::shared_ptr<Socket> socket, const std::string& what_arg) {
+    Message message(MessageType::error, what_arg);
     socket->send_line(message.to_network());
-
-    // send last messages
-    std::unique_lock ul_messages(m_messages);
-    for (const auto& m : messages)
-        socket->send_line(m.to_network());
-    ul_messages.unlock();
-    message = Message(MessageType::done_last_messages);
-    socket->send_line(message.to_network());
-
-    return user;
 }
 
-void logout(std::shared_ptr<User> user) {
-    user->logout();
-    std::string nickname = user->get_nickname();
-    std::lock_guard lg(m_users);
-    users.erase(nickname);
-    Message message(MessageType::logout, nickname);
-    for (const auto& u : users)
-        u.second->send_message(message);
+std::shared_ptr<User> login() {
+    while (true) {
+        std::shared_ptr<Socket> socket = *users_login.get();
+        std::shared_ptr<User> user;
+        Message message;
+        std::string what_arg;
+
+        try {
+            // receive nickname
+            std::optional<std::string> opt_m = socket->receive_line(MAX_IDLE_TIME);
+            if (!opt_m) continue;
+            message = make_message_from_network(*opt_m);
+            if (message.get_type() != MessageType::login) send_error(socket, "expected login");
+            std::string nickname = message.get_message();
+
+            // check nickname
+            std::unique_lock ul_users(m_users);
+            bool correct_nickname = false;
+            if (online_users.contains(nickname)) send_error(socket, "nickname already used");
+            else if (nickname.find(' ') != std::string::npos) send_error(socket, "nickname with whitespaces");
+            else correct_nickname = true;
+            if (!correct_nickname) continue;
+
+            // create and add user
+            user = std::make_shared<User>(socket, nickname);
+            online_users[nickname] = user;
+
+            // wait if limit of users reached
+            cv_users.wait(ul_users, []() { return online_users.size() < MAX_CLIENTS; });
+
+            // prepare online users and send login message to others
+            message = Message(MessageType::login, nickname);
+            std::ostringstream oss;
+            for (const auto &u : online_users) {
+                if (u.second == user) continue;
+                u.second->send_message(message);
+                oss << u.first << " ";
+            }
+            ul_users.unlock();
+
+            // send online users to new user
+            message = Message(MessageType::online_users, oss.str());
+            socket->send_line(message.to_network());
+
+            // send last messages to new user
+            std::unique_lock ul_messages(m_messages);
+            for (const auto &m : last_messages)
+                socket->send_line(m.to_network());
+            ul_messages.unlock();
+            message = Message(MessageType::done_last_messages);
+            socket->send_line(message.to_network());
+
+        } catch (const std::exception& e) {
+            log(std::string("during login: ") + e.what());
+            continue;   // next user (robust server)
+        }
+
+        // start send and receive services (blocking)
+        users_send.put(user);
+        users_receive.put(user);
+    }
+}
+
+void logout() {
+    while (true) {
+        std::shared_ptr<User> user = *users_logout.get();
+        std::string nickname = user->get_nickname();
+
+        // logout
+        user->logout();
+
+        // erase user
+        std::lock_guard lg(m_users);
+        online_users.erase(nickname);
+
+        // send logout message to others
+        Message message(MessageType::logout, nickname);
+        for (const auto& u : online_users)
+            u.second->send_message(message);
+
+        // notify spot for new user
+        cv_users.notify_one();
+    }
 }
 
 void send_private_message(std::shared_ptr<User> user, Message message) {
-    std::unique_lock ul_users(m_users);
-
-    // check message
+    std::shared_ptr<Socket> socket = user->get_socket();
     std::string destination = message.get_destination();
     std::string source = message.get_source();
-    if (destination == source)
-        message = Message(MessageType::error, "you cannot send PM to yourself");
-    else if (source != user->get_nickname())
-        message = Message(MessageType::error, "no source spoofing thanks ;)");
-    else if (!users.contains(destination))
-        message = Message(MessageType::error, destination + " is not online");
 
-    // send message
-    MessageType type = message.get_type();
-    if (type == MessageType::error) user->send_message(message);
-    else users[destination]->send_message(message);
+    std::unique_lock ul_users(m_users);
+    if (destination == source) send_error(socket, "you cannot send PM to yourself");
+    else if (source != user->get_nickname()) send_error(socket, "no source spoofing thanks ;)");
+    else if (!online_users.contains(destination)) send_error(socket, destination + " is not online");
+    else online_users[destination]->send_message(message);
 }
 
 void send_public_message(std::shared_ptr<User> user, const Message& message) {
-    // send to all users
+    // send to others
     std::unique_lock ul_users(m_users);
-    for (auto &u : users)
+    for (auto &u : online_users)
         if (u.second != user)
             u.second->send_message(message);
     ul_users.unlock();
 
-    // add message to last messages
+    // add to last messages
     std::unique_lock ul_messages(m_messages);
-    messages.push(message);
+    last_messages.push(message);
 }
 
-// service: send messages to other users (+ login and logout)
 void send_messages() {
-    print("new sender - hello world!");
+    log("new sender - hello world!");
 
     while (true) {
-        std::shared_ptr<User> user;
+        // get user
+        std::shared_ptr<User> user = *users_send.get();
+        std::shared_ptr<Socket> socket = user->get_socket();
+        bool next = false;
 
-        try {
-            // login
-            std::shared_ptr<Socket> socket = *users_login.get();
-            user = login(socket);
-            std::string nickname = user->get_nickname();
-
-            // launch receive service
-            users_receive.put(user);
-
-            bool next = false;
-            while (!next) {
-                // receive command from user
-                std::optional<std::string> opt_m = socket->receive_line(MAX_IDLE_TIME);
-                if (!opt_m) break;
+        // serve user: send messages to other users
+        while (!next) {
+            // receive command from user
+            std::optional<std::string> opt_m = socket->receive_line(MAX_IDLE_TIME);
+            if (!opt_m) break;
+            try {
                 Message message = make_message_from_network(*opt_m);
                 MessageType type = message.get_type();
 
+                // execute command
                 switch (type) {
                     case MessageType::quit:
                         next = true;
@@ -154,30 +192,30 @@ void send_messages() {
                         send_public_message(user, message);
                         break;
                     default:
-                        message = Message(MessageType::error, "wrong type");
+                        send_error(socket, "invalid type");
                         next = true;
                         break;
                 }
+            } catch (const std::exception& e) {
+                log(std::string("while sending: ") + e.what());
+                break;   // logout and next user (robust server)
             }
-        } catch (...) {
-            // error (e.g. broken pipe due to connection closed by client or protocol not respected by client)
-            // nothing to do here... logout the user and serve next one
         }
 
-        // logout
-        if (user) logout(user);
+        // start logout service
+        users_logout.put(user);
     }
 }
 
-// service: receive messages from other users
 void receive_messages() {
-    print("new receiver - hello world!");
+    log("new receiver - hello world!");
 
     while (true) {
         // get user
         std::shared_ptr<User> user = *users_receive.get();
         std::shared_ptr<Socket> socket = user->get_socket();
 
+        // serve user: receive messages from other users
         while (true) {
             // receive message from other user
             std::optional<Message> opt_m = user->receive_message();
@@ -188,7 +226,7 @@ void receive_messages() {
             try {
                 socket->send_line(message.to_network());
             } catch (...) {
-                // error (e.g. broken pipe due to connection closed by client or protocol not respected by client)
+                // error (e.g. broken pipe due to connection closed by client)
                 // nothing to do here... just serve next user
                 break;
             }
@@ -200,17 +238,30 @@ int main(int argc, char **argv) {
     const std::string usage = std::string{} + "usage: " + argv[0] + " port";
 
     if (argc < 2) {
-        std::cerr << usage << std::endl;
+        std::cout << usage << std::endl;
         std::exit(EXIT_FAILURE);
     }
 
+    // parse port
     int port;
     try {
         port = std::stoi(argv[1]);
-    } catch (std::invalid_argument e) {
+    } catch (const std::invalid_argument& e) {
         std::cerr << "invalid port" << std::endl;
-        std::cerr << usage << std::endl;
+        std::cout << usage << std::endl;
         std::exit(EXIT_FAILURE);
+    }
+
+    // launch thread for login
+    for (int i=0; i<N_LOGIN_THREADS; i++) {
+        std::thread t(login);
+        t.detach();
+    }
+
+    // launch thread for logout
+    for (int i=0; i<N_LOGOUT_THREADS; i++) {
+        std::thread t(logout);
+        t.detach();
     }
 
     // launch thread pool of receivers (receive messages from other users, consumers)
@@ -225,22 +276,21 @@ int main(int argc, char **argv) {
         t.detach();
     }
 
-    // accept sockets
-    ServerSocket ss(port);
+    // listen
+    ServerSocket server_socket(port);
     while (true) {
-        std::shared_ptr<Socket> s;
-
-        // accept connection
+        // accept
+        std::shared_ptr<Socket> socket;
         try {
-            s = ss.accept();
-        } catch (std::runtime_error e) {
-            print(e.what());
+            socket = server_socket.accept();
+        } catch (const std::runtime_error& e) {
+            log(e.what());
             continue;
         }
 
-        // serve connection (concurrently)
+        // start login service
         std::unique_lock ul_users(m_users);
-        users_login.put(s);
-        print("connection accepted from " + s->get_remote_address());
+        users_login.put(socket);
+        log("connection accepted from " + socket->get_remote_address());
     }
 }

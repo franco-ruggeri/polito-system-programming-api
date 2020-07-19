@@ -1,6 +1,6 @@
-//
-// Created by fruggeri on 7/9/20.
-//
+/*
+ * Author: Franco Ruggeri
+ */
 
 #include "Socket.h"
 #include <sys/socket.h>
@@ -117,8 +117,8 @@ std::optional<std::string> Socket::receive_line(long timeout) {
     return line;
 }
 
-void Socket::send_line(const std::string& msg) {
-    std::string line = msg + '\n';
+void Socket::send_line(const std::string& message) {
+    std::string line = message + '\n';
     const char *ptr = line.c_str();
     size_t n_left = line.size();
     ssize_t n_written;

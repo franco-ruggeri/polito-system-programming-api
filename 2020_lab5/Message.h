@@ -1,6 +1,8 @@
-//
-// Created by fruggeri on 7/17/20.
-//
+/*
+ * Message for the chat room application protocol.
+ *
+ * Author: Franco Ruggeri
+ */
 
 #pragma once
 
@@ -25,8 +27,8 @@ public:
     std::string get_destination() const;
     std::string get_message() const;
 
-    std::string to_console() const;
-    std::string to_network() const;
+    std::string to_console() const;     // visualization format (for client)
+    std::string to_network() const;     // network format (serialization)
 
     friend Message make_message_from_command(std::string source_nickname, std::string input);
     friend Message make_message_from_network(std::string input);

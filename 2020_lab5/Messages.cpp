@@ -1,6 +1,6 @@
-//
-// Created by fruggeri on 7/18/20.
-//
+/*
+ * Author: Franco Ruggeri
+ */
 
 #include "Messages.h"
 

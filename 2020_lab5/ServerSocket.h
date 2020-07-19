@@ -1,6 +1,8 @@
-//
-// Created by fruggeri on 7/9/20.
-//
+/*
+ * Passive stream socket (for listening).
+ *
+ * Author: Franco Ruggeri
+ */
 
 #pragma once
 

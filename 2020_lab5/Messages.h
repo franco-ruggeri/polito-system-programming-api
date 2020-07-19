@@ -1,6 +1,9 @@
-//
-// Created by fruggeri on 7/18/20.
-//
+/*
+ * Container of Message objects. It has a limited size. When a new message is pushed and the container is full,
+ * the oldest one gets discarded (FIFO).
+ *
+ * Author: Franco Ruggeri
+ */
 
 #pragma once
 
@@ -13,7 +16,7 @@ class Messages {
 
 public:
     Messages(unsigned int max_messages);
-    void push(const Message& message);
+    void push(const Message& message);      // add message and discards oldest one if full
     std::list<Message>::iterator begin();
     std::list<Message>::iterator end();
 };

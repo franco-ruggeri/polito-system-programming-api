@@ -1,6 +1,6 @@
-//
-// Created by fruggeri on 7/9/20.
-//
+/*
+ * Author: Franco Ruggeri
+ */
 
 #include "User.h"
 
@@ -15,13 +15,13 @@ std::string User::get_nickname() {
 }
 
 void User::send_message(const Message& message) {
-    incoming_messages.put(message);
+    inbox.put(message);
 }
 
 std::optional<Message> User::receive_message() {
-    return incoming_messages.get();
+    return inbox.get();
 }
 
 void User::logout() {
-    incoming_messages.close();
+    inbox.close();
 }

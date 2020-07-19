@@ -1,6 +1,8 @@
-//
-// Created by fruggeri on 7/8/20.
-//
+/*
+ * Generic thread-safe FIFO queue with support to termination.
+ *
+ * Author: Franco Ruggeri
+ */
 
 #pragma once
 
