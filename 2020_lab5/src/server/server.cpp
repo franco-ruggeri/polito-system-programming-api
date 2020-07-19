@@ -17,9 +17,9 @@
 #include <mutex>
 #include <condition_variable>
 #include "ServerSocket.h"
+#include "Socket.h"
 #include "Jobs.h"
 #include "User.h"
-#include "Message.h"
 #include "Messages.h"
 
 #define N_LOGIN_THREADS 2
@@ -28,10 +28,7 @@
 #define MAX_IDLE_TIME 60
 #define MAX_MESSAGES 32
 
-// TODO: completa refactor in client (comments, Console class, more functions)
-// namespace + underscore
-// struttura progetto
-// commenta classi
+// TODO: namespace + underscore
 
 Jobs<std::shared_ptr<Socket>> users_login(MAX_CLIENTS);         // producer=main, consumer=login
 Jobs<std::shared_ptr<User>> users_send(MAX_CLIENTS);            // producer=login, consumer=send
