@@ -7,7 +7,7 @@ find_package(Threads REQUIRED)
 
 include_directories("${PROJECT_SOURCE_DIR}/include")
 
-add_executable(server server.cpp)
+add_executable(server server.cpp User.cpp)
 
 target_link_libraries(server ${CMAKE_THREAD_LIBS_INIT} protocol socket)
 
