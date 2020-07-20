@@ -22,20 +22,20 @@
 #include "User.h"
 #include "Messages.h"
 
-#define N_LOGIN_THREADS 2
-#define N_LOGOUT_THREADS 1
-#define MAX_CLIENTS 32
-#define MAX_IDLE_TIME 60
-#define MAX_MESSAGES 32
+using namespace chat_room;
 
-// TODO: namespace + underscore
+const unsigned int n_login_threads = 2;
+const unsigned int n_logout_threads = 1;
+const unsigned int max_clients = 32;
+const unsigned int max_idle_time = 60;
+const unsigned int max_messages = 32;
 
-Jobs<std::shared_ptr<Socket>> users_login(MAX_CLIENTS);         // producer=main, consumer=login
-Jobs<std::shared_ptr<User>> users_send(MAX_CLIENTS);            // producer=login, consumer=send
-Jobs<std::shared_ptr<User>> users_receive(MAX_CLIENTS);         // producer=login, consumer=receive
-Jobs<std::shared_ptr<User>> users_logout(MAX_CLIENTS);          // producer=send, consumer=logout
+Jobs<std::shared_ptr<Socket>> users_login(max_clients);         // producer=main, consumer=login
+Jobs<std::shared_ptr<User>> users_send(max_clients);            // producer=login, consumer=send
+Jobs<std::shared_ptr<User>> users_receive(max_clients);         // producer=login, consumer=receive
+Jobs<std::shared_ptr<User>> users_logout(max_clients);          // producer=send, consumer=logout
 std::unordered_map<std::string,std::shared_ptr<User>> online_users;
-Messages last_messages(MAX_MESSAGES);
+Messages last_messages(max_messages);
 std::mutex m_log, m_users, m_messages;
 std::condition_variable cv_users;
 
@@ -58,11 +58,11 @@ std::shared_ptr<User> login() {
 
         try {
             // receive nickname
-            std::optional<std::string> opt_m = socket->receive_line(MAX_IDLE_TIME);
+            std::optional<std::string> opt_m = socket->receive_line(max_idle_time);
             if (!opt_m) continue;
             message = make_message_from_network(*opt_m);
-            if (message.get_type() != MessageType::login) send_error(socket, "expected login");
-            std::string nickname = message.get_message();
+            if (message.type() != MessageType::login) send_error(socket, "expected login");
+            std::string nickname = message.message();
 
             // check nickname
             std::unique_lock ul_users(m_users);
@@ -77,7 +77,7 @@ std::shared_ptr<User> login() {
             online_users[nickname] = user;
 
             // wait if limit of users reached
-            cv_users.wait(ul_users, []() { return online_users.size() < MAX_CLIENTS; });
+            cv_users.wait(ul_users, []() { return online_users.size() < max_clients; });
 
             // prepare online users and send login message to others
             message = Message(MessageType::login, nickname);
@@ -115,7 +115,7 @@ std::shared_ptr<User> login() {
 void logout() {
     while (true) {
         std::shared_ptr<User> user = *users_logout.get();
-        std::string nickname = user->get_nickname();
+        std::string nickname = user->nickname();
 
         // logout
         user->logout();
@@ -135,13 +135,13 @@ void logout() {
 }
 
 void send_private_message(std::shared_ptr<User> user, Message message) {
-    std::shared_ptr<Socket> socket = user->get_socket();
-    std::string destination = message.get_destination();
-    std::string source = message.get_source();
+    std::shared_ptr<Socket> socket = user->socket();
+    std::string destination = message.destination();
+    std::string source = message.source();
 
     std::unique_lock ul_users(m_users);
     if (destination == source) send_error(socket, "you cannot send PM to yourself");
-    else if (source != user->get_nickname()) send_error(socket, "no source spoofing thanks ;)");
+    else if (source != user->nickname()) send_error(socket, "no source spoofing thanks ;)");
     else if (!online_users.contains(destination)) send_error(socket, destination + " is not online");
     else online_users[destination]->send_message(message);
 }
@@ -165,17 +165,17 @@ void send_messages() {
     while (true) {
         // get user
         std::shared_ptr<User> user = *users_send.get();
-        std::shared_ptr<Socket> socket = user->get_socket();
+        std::shared_ptr<Socket> socket = user->socket();
         bool next = false;
 
         // serve user: send messages to other users
         while (!next) {
             // receive command from user
-            std::optional<std::string> opt_m = socket->receive_line(MAX_IDLE_TIME);
+            std::optional<std::string> opt_m = socket->receive_line(max_idle_time);
             if (!opt_m) break;
             try {
                 Message message = make_message_from_network(*opt_m);
-                MessageType type = message.get_type();
+                MessageType type = message.type();
 
                 // execute command
                 switch (type) {
@@ -210,7 +210,7 @@ void receive_messages() {
     while (true) {
         // get user
         std::shared_ptr<User> user = *users_receive.get();
-        std::shared_ptr<Socket> socket = user->get_socket();
+        std::shared_ptr<Socket> socket = user->socket();
 
         // serve user: receive messages from other users
         while (true) {
@@ -250,25 +250,25 @@ int main(int argc, char **argv) {
     }
 
     // launch thread for login
-    for (int i=0; i<N_LOGIN_THREADS; i++) {
+    for (int i=0; i < n_login_threads; i++) {
         std::thread t(login);
         t.detach();
     }
 
     // launch thread for logout
-    for (int i=0; i<N_LOGOUT_THREADS; i++) {
+    for (int i=0; i < n_logout_threads; i++) {
         std::thread t(logout);
         t.detach();
     }
 
     // launch thread pool of receivers (receive messages from other users, consumers)
-    for (int i=0; i<MAX_CLIENTS; i++) {
+    for (int i=0; i < max_clients; i++) {
         std::thread t(receive_messages);
         t.detach();
     }
 
     // launch thread pool of senders (send messages to other users, producers)
-    for (int i=0; i<MAX_CLIENTS; i++) {
+    for (int i=0; i < max_clients; i++) {
         std::thread t(send_messages);
         t.detach();
     }
@@ -288,6 +288,6 @@ int main(int argc, char **argv) {
         // start login service
         std::unique_lock ul_users(m_users);
         users_login.put(socket);
-        log("connection accepted from " + socket->get_remote_address());
+        log("connection accepted from " + socket->remote_address());
     }
 }

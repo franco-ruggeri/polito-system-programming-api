@@ -13,52 +13,54 @@
 #include <optional>
 #include <stdexcept>
 
-template<typename T>
-class Jobs {
-    std::queue<T> jobs;
-    std::mutex m_jobs;
-    std::condition_variable cv_full;
-    std::condition_variable cv_empty;
-    bool closed;
-    unsigned int max_size;
+namespace chat_room {
+    template<typename T>
+    class Jobs {
+        std::queue<T> jobs_;
+        std::mutex m_jobs_;
+        std::condition_variable cv_full_;
+        std::condition_variable cv_empty_;
+        bool closed_;
+        unsigned int max_size_;
 
-    static const unsigned int default_max_size = 1024;
+        static const unsigned int default_max_size = 1024;
 
-public:
-    Jobs() : max_size(default_max_size), closed(false) {}
-    Jobs(unsigned int max_size) : max_size(max_size), closed(false) {}
+    public:
+        Jobs() : max_size_(default_max_size), closed_(false) {}
+        Jobs(unsigned int max_size) : max_size_(max_size), closed_(false) {}
 
-    Jobs& operator=(const Jobs& other) {
-        this->jobs = other.jobs;
-        this->closed = other.closed;
-        this->max_size = other.max_size;
-        return *this;
-    }
+        Jobs& operator=(const Jobs& other) {
+            this->jobs_ = other.jobs_;
+            this->closed_ = other.closed_;
+            this->max_size_ = other.max_size_;
+            return *this;
+        }
 
-    // insert a job in the queue waiting to be processed, or blocks if the queue is full
-    void put(T job) {
-        std::unique_lock ul(m_jobs);
-        if (closed) throw std::logic_error("put() called on closed queue");
-        cv_full.wait(ul, [this]() { return jobs.size() < max_size; });
-        jobs.push(std::move(job));
-        cv_empty.notify_one();
-    }
+        // insert a job in the queue waiting to be processed, or blocks if the queue is full
+        void put(T job) {
+            std::unique_lock ul(m_jobs_);
+            if (closed_) throw std::logic_error("put() called on closed queue");
+            cv_full_.wait(ul, [this]() { return jobs_.size() < max_size_; });
+            jobs_.push(std::move(job));
+            cv_empty_.notify_one();
+        }
 
-    // read a job from the queue and remove it, or blocks if the queue is empty
-    std::optional<T> get() {
-        std::unique_lock ul(m_jobs);
-        cv_empty.wait(ul, [&]() { return !jobs.empty() || closed; });
-        if (jobs.empty()) return std::nullopt;  // no jobs and no producers
-        T t = jobs.front();
-        jobs.pop();
-        cv_full.notify_one();
-        return t;
-    }
+        // read a job from the queue and remove it, or blocks if the queue is empty
+        std::optional<T> get() {
+            std::unique_lock ul(m_jobs_);
+            cv_empty_.wait(ul, [&]() { return !jobs_.empty() || closed_; });
+            if (jobs_.empty()) return std::nullopt;  // no jobs and no producers
+            T t = jobs_.front();
+            jobs_.pop();
+            cv_full_.notify_one();
+            return t;
+        }
 
-    // close queue, no more jobs can be added
-    void close() {
-        std::lock_guard lg(m_jobs);
-        closed = true;
-        cv_empty.notify_all();  // notify consumers
-    }
-};
+        // close queue, no more jobs can be added
+        void close() {
+            std::lock_guard lg(m_jobs_);
+            closed_ = true;
+            cv_empty_.notify_all();  // notify consumers
+        }
+    };
+}

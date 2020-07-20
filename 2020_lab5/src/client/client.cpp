@@ -17,11 +17,13 @@
 #include "Messages.h"
 #include "Console.h"
 
-#define MAX_MESSAGES 32
+using namespace chat_room;
+
+const unsigned int max_messages = 32;
 
 Console console;
-Messages last_messages(MAX_MESSAGES);
 std::string command;
+Messages last_messages(max_messages);
 bool io_event=false, terminate_now=false, terminate_after_key=false;
 std::mutex m;
 std::condition_variable cv;
@@ -56,7 +58,7 @@ void login(std::shared_ptr<Socket> socket, const std::string& nickname) {
     opt_m = socket->receive_line();
     if (!opt_m) throw std::runtime_error("connection error");
     message = make_message_from_network(*opt_m);
-    if (message.get_type() != MessageType::online_users) throw std::logic_error("expected online users");
+    if (message.type() != MessageType::online_users) throw std::logic_error("expected online users");
     last_messages.push(message);
 
     // receive last messages
@@ -64,7 +66,7 @@ void login(std::shared_ptr<Socket> socket, const std::string& nickname) {
         opt_m = socket->receive_line();
         if (!opt_m) throw std::runtime_error("connection error");
         message = make_message_from_network(*opt_m);
-        MessageType type = message.get_type();
+        MessageType type = message.type();
         if (type == MessageType::done_last_messages) break;
         if (type != MessageType::public_message) throw std::logic_error("expected last messages");
         last_messages.push(message);
@@ -79,7 +81,7 @@ void login(std::shared_ptr<Socket> socket, const std::string& nickname) {
 void send_message(const std::shared_ptr<Socket>& socket, std::string nickname) {
     Message message = make_message_from_command(nickname, command);
     socket->send_line(message.to_network());
-    if (message.get_type() == MessageType::quit) terminate_now = true;
+    if (message.type() == MessageType::quit) terminate_now = true;
     else last_messages.push(message);
     command.clear();
 }

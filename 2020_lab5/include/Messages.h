@@ -10,13 +10,15 @@
 #include <list>
 #include "Message.h"
 
-class Messages {
-    std::list<Message> messages;
-    const unsigned int max_messages;
+namespace chat_room {
+    class Messages {
+        std::list<Message> messages_;
+        const unsigned int max_messages_;
 
-public:
-    Messages(unsigned int max_messages);
-    void push(const Message& message);      // add message and discards oldest one if full
-    std::list<Message>::iterator begin();
-    std::list<Message>::iterator end();
-};
+    public:
+        Messages(unsigned int max_messages);
+        void push(const Message& message);      // add message and discards oldest one if full
+        std::list<Message>::iterator begin();
+        std::list<Message>::iterator end();
+    };
+}
