@@ -7,11 +7,11 @@
 namespace chat_room {
     User::User(std::shared_ptr<Socket> socket, std::string nickname) : socket_(socket), nickname_(nickname) {}
 
-    std::shared_ptr<Socket> User::socket() {
+    std::shared_ptr<Socket> User::socket() const {
         return socket_;
     }
 
-    std::string User::nickname() {
+    std::string User::nickname() const {
         return nickname_;
     }
 

@@ -6,8 +6,6 @@
 
 #pragma once
 
-#include <string>
-
 namespace chat_room {
     enum class MessageType : int {
         error=0,

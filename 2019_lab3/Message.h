@@ -6,22 +6,18 @@
 
 #include <memory>
 #include "Symbol.h"
+#include "MessageType.h"
 
 class SharedEditor;
 
-enum class MessageType {
-    insert, erase
-};
-
 class Message {
-public:
-    Message(std::shared_ptr<SharedEditor> source, Symbol symbol, MessageType type);
-    std::shared_ptr<SharedEditor> get_source() const;
-    MessageType get_type() const;
-    Symbol get_symbol() const;
-
-private:
     std::shared_ptr<SharedEditor> source;
     Symbol symbol;
     MessageType type;
+
+public:
+    Message(std::shared_ptr<SharedEditor> source, const Symbol& symbol, MessageType type);
+    std::shared_ptr<SharedEditor> get_source() const;
+    MessageType get_type() const;
+    Symbol get_symbol() const;
 };
