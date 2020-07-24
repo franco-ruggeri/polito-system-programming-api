@@ -67,7 +67,7 @@ std::vector<int> LSEQ::get_between(std::vector<int> prev, std::vector<int> next)
             // example: prev=1.5, next=2.5, begin=0, end=9, step=5 => leaf = 5-(9-5-1) = 2 (i.e. position 2.2)
             if (prev[depth] + step >= end) {
                 std::copy(next.begin(), next.begin()+depth, std::back_inserter(between));
-                between.push_back(begin + step - (end-prev[depth]-1));
+                between.push_back(begin + step - - (next[depth]==end ? 0 : end-prev[depth]-1));
             } else {
                 std::copy(prev.begin(), prev.begin()+depth, std::back_inserter(between));
                 between.push_back(prev[depth] + step);
@@ -77,7 +77,7 @@ std::vector<int> LSEQ::get_between(std::vector<int> prev, std::vector<int> next)
             // same as above, but reversed
             if (next[depth] - step <= begin) {
                 std::copy(prev.begin(), prev.begin()+depth, std::back_inserter(between));
-                between.push_back(end - step + (next[depth]-begin-1));
+                between.push_back(end - step + (next[depth]==begin ? 0 : next[depth]-begin-1));
             } else {
                 std::copy(next.begin(), next.begin()+depth, std::back_inserter(between));
                 between.push_back(next[depth] - step);

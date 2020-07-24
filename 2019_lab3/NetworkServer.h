@@ -18,6 +18,6 @@ class NetworkServer {
 public:
     int connect(std::shared_ptr<SharedEditor> shared_editor);
     void disconnect(std::shared_ptr<SharedEditor> shared_editor);
-    void send(Message message);
+    void send(const Message& message);
     void dispatch_messages();
 };

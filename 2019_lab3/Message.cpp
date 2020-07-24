@@ -4,7 +4,7 @@
 
 #include "Message.h"
 
-Message::Message(std::shared_ptr<SharedEditor> source, Symbol symbol, MessageType type) :
+Message::Message(std::shared_ptr<SharedEditor> source, const Symbol& symbol, MessageType type) :
                 source(source), symbol(symbol), type(type) {}
 
 std::shared_ptr<SharedEditor> Message::get_source() const {

@@ -17,7 +17,7 @@ void NetworkServer::disconnect(std::shared_ptr<SharedEditor> shared_editor) {
         editors.erase(it);
 }
 
-void NetworkServer::send(Message message) {
+void NetworkServer::send(const Message& message) {
     messages.push(message);
 }
 
