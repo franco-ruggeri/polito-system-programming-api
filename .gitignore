@@ -1,1 +1,9 @@
+# IDE stuff
+cmake-build-debug/
+.idea/
+bin/
+build/
+
+# extra exercises
 food_for_thought_*/
+lab3_2019/
